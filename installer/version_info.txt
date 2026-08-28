@@ -1,0 +1,3 @@
+# Documented compatibility placeholder only.
+# The actual PyInstaller version resource is generated at build time by
+# stock_tool.version_resource from stock_tool.__version__.

@@ -1,0 +1,29 @@
+{
+  "dataset_version": "sprint9-sample-v1",
+  "concepts": [
+    {
+      "concept_key": "hbm",
+      "display_name": "高頻寬記憶體",
+      "description": "高頻寬記憶體相關研究索引；關係需以個別證據判讀，不代表完整供應鏈。",
+      "aliases": ["HBM", "high bandwidth memory", "高頻寬記憶體"]
+    },
+    {
+      "concept_key": "advanced_packaging",
+      "display_name": "先進封裝",
+      "description": "2.5D、3D 與異質整合封裝的研究索引。",
+      "aliases": ["advanced packaging", "先進封裝"]
+    },
+    {
+      "concept_key": "cowos",
+      "display_name": "CoWoS",
+      "description": "晶圓級先進封裝平台的研究索引。",
+      "aliases": ["CoWoS", "chip on wafer on substrate"]
+    },
+    {
+      "concept_key": "humanoid_robot",
+      "display_name": "人形機器人",
+      "description": "人形機器人產業鏈研究索引。",
+      "aliases": ["humanoid robot", "機器人"]
+    }
+  ]
+}

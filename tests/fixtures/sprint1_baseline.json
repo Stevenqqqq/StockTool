@@ -1,0 +1,102 @@
+{
+  "package_version": "1.4.0",
+  "feature_flags": {
+    "legacy_dashboard_enabled": true,
+    "research_workspace_enabled": false
+  },
+  "sample_data": {
+    "price_file": "data/sample/sample_tw_prices_for_indicators.csv",
+    "fundamental_file": "data/sample/sample_fundamental_scores.csv",
+    "raw_price_rows": 260,
+    "clean_price_rows": 260,
+    "symbol": "2330",
+    "period_start": "2024-01-02",
+    "period_end": "2024-12-30",
+    "latest_indicators": {
+      "sma_20": 739.308,
+      "sma_60": 728.488,
+      "rsi_14": 77.010761,
+      "macd_dif": 2.48375,
+      "macd_dea": 2.456146,
+      "atr_14": 8.3,
+      "return_20": 0.003856,
+      "volatility_20": 0.001792
+    }
+  },
+  "market_acceptance": [
+    {
+      "input_symbol": "2330",
+      "market": "TWSE",
+      "query_symbol": "2330.TW",
+      "source_type": "offline_symbol_contract_fixture",
+      "available_columns": [
+        "date",
+        "symbol",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "adjusted_close"
+      ],
+      "result_status": "validated"
+    },
+    {
+      "input_symbol": "6488",
+      "market": "TPEX",
+      "query_symbol": "6488.TWO",
+      "source_type": "offline_symbol_contract_fixture",
+      "available_columns": [
+        "date",
+        "symbol",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "adjusted_close"
+      ],
+      "result_status": "validated"
+    },
+    {
+      "input_symbol": "AAPL",
+      "market": "US",
+      "query_symbol": "AAPL",
+      "source_type": "offline_symbol_contract_fixture",
+      "available_columns": [
+        "date",
+        "symbol",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "adjusted_close"
+      ],
+      "result_status": "validated"
+    }
+  ],
+  "stock_score": {
+    "total_score": 84.4,
+    "available_score": 84.4,
+    "coverage": 1.0,
+    "technical_score": 28.0,
+    "fundamental_score": 30.0,
+    "valuation_score": 8.4,
+    "risk_score": 18.0,
+    "rating_label": "完整資料：研究條件偏強"
+  },
+  "backtest": {
+    "trade_count": 1,
+    "signal_date": "2024-01-02",
+    "execution_date": "2024-01-03",
+    "execution_price": 580.72,
+    "ending_cash": 4192.8,
+    "total_return": 0.0018
+  },
+  "report_markers": {
+    "has_history_disclaimer": true,
+    "has_survivorship_warning": true,
+    "has_trade_log": true
+  }
+}

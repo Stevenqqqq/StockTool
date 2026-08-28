@@ -1,0 +1,86 @@
+symbol,name,market,exchange,industry,concept,keywords,source,note
+2330,台積電,TWSE,TWSE,半導體,先進製程,晶圓代工;AI;HPC;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2454,聯發科,TWSE,TWSE,半導體,IC設計,手機晶片;邊緣AI;通訊晶片;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2303,聯電,TWSE,TWSE,半導體,成熟製程,晶圓代工;車用;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+3711,日月光投控,TWSE,TWSE,半導體,封測,封裝;測試;先進封裝;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+3034,聯詠,TWSE,TWSE,半導體,IC設計,顯示驅動IC;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2379,瑞昱,TWSE,TWSE,半導體,IC設計,網通晶片;音訊晶片;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+3443,創意,TWSE,TWSE,半導體,ASIC,IC設計服務;AI晶片;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+3661,世芯-KY,TWSE,TWSE,半導體,ASIC,AI晶片;IC設計服務;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+6488,環球晶,TPEX,TPEx,半導體,矽晶圓,晶圓材料;半導體材料;台股上櫃,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+3105,穩懋,TPEX,TPEx,半導體,化合物半導體,砷化鎵;射頻;PA;台股上櫃,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2382,廣達,TWSE,TWSE,AI伺服器,伺服器代工,AI;雲端;資料中心;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+3231,緯創,TWSE,TWSE,AI伺服器,伺服器代工,AI;資料中心;ODM;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+6669,緯穎,TWSE,TWSE,AI伺服器,雲端資料中心,AI;資料中心;伺服器;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2356,英業達,TWSE,TWSE,AI伺服器,伺服器代工,AI;筆電;伺服器;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2317,鴻海,TWSE,TWSE,AI伺服器,伺服器與電動車,AI;電動車;組裝;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2376,技嘉,TWSE,TWSE,AI伺服器,主機板與伺服器,GPU伺服器;AI;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2357,華碩,TWSE,TWSE,AI伺服器,PC與伺服器,AI PC;伺服器;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+3017,奇鋐,TWSE,TWSE,AI伺服器,散熱,AI散熱;資料中心;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+3324,雙鴻,TWSE,TWSE,AI伺服器,散熱,AI散熱;伺服器;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+3653,健策,TWSE,TWSE,AI伺服器,散熱與導線架,散熱;均熱片;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2308,台達電,TWSE,TWSE,電動車,電源與能源管理,EV;充電;儲能;電源;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+3665,貿聯-KY,TWSE,TWSE,電動車,線束與連接,EV;車用線束;充電;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+1536,和大,TWSE,TWSE,電動車,車用零組件,EV;齒輪;傳動系統;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2231,為升,TWSE,TWSE,電動車,車用電子,胎壓偵測;TPMS;EV;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+1504,東元,TWSE,TWSE,綠能,電機與儲能,儲能;電網;馬達;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+1513,中興電,TWSE,TWSE,綠能,電網設備,重電;電網;儲能;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+1609,大亞,TWSE,TWSE,綠能,電線電纜,電網;綠電;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+6443,元晶,TWSE,TWSE,綠能,太陽能,太陽能;模組;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+6477,安集,TWSE,TWSE,綠能,太陽能,太陽能;模組;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2603,長榮,TWSE,TWSE,航運,海運,貨櫃航運;海運;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2609,陽明,TWSE,TWSE,航運,海運,貨櫃航運;海運;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2615,萬海,TWSE,TWSE,航運,海運,貨櫃航運;海運;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2618,長榮航,TWSE,TWSE,航運,航空,航空;客運;貨運;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2610,華航,TWSE,TWSE,航運,航空,航空;客運;貨運;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2881,富邦金,TWSE,TWSE,金融,金控,銀行;保險;證券;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2882,國泰金,TWSE,TWSE,金融,金控,銀行;保險;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2891,中信金,TWSE,TWSE,金融,金控,銀行;金融;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2886,兆豐金,TWSE,TWSE,金融,金控,銀行;金融;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+2884,玉山金,TWSE,TWSE,金融,金控,銀行;金融;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+6446,藥華藥,TWSE,TWSE,生技醫療,新藥,生技;製藥;醫療;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+1760,寶齡富錦,TWSE,TWSE,生技醫療,製藥,生技;醫療;腎臟病;台股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+4743,合一,TPEX,TPEx,生技醫療,新藥,生技;新藥;醫材;台股上櫃,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+4105,東洋,TPEX,TPEx,生技醫療,製藥,癌症用藥;生技;台股上櫃,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+NVDA,NVIDIA,US,NASDAQ,半導體,AI GPU,AI;GPU;資料中心;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+AMD,AMD,US,NASDAQ,半導體,CPU與GPU,AI;GPU;CPU;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+AVGO,Broadcom,US,NASDAQ,半導體,ASIC與網通晶片,AI;ASIC;網通;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+INTC,Intel,US,NASDAQ,半導體,CPU與晶圓製造,CPU;晶圓製造;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+TSM,TSMC ADR,US,NYSE,半導體,晶圓代工,台積電ADR;晶圓代工;AI;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+ASML,ASML,US,NASDAQ,半導體,半導體設備,EUV;設備;晶圓製程;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+ARM,Arm Holdings,US,NASDAQ,半導體,晶片架構,IP;AI;手機晶片;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+QCOM,Qualcomm,US,NASDAQ,半導體,通訊晶片,手機晶片;AI;5G;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+MU,Micron,US,NASDAQ,半導體,記憶體,DRAM;HBM;AI;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+MRVL,Marvell,US,NASDAQ,半導體,資料中心晶片,AI;網通;資料中心;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+MSFT,Microsoft,US,NASDAQ,雲端,雲端平台,Azure;AI;SaaS;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+AMZN,Amazon,US,NASDAQ,雲端,雲端平台,AWS;電商;AI;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+GOOGL,Alphabet,US,NASDAQ,雲端,搜尋與雲端,Google Cloud;AI;廣告;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+ORCL,Oracle,US,NYSE,雲端,企業雲端,資料庫;雲端;企業軟體;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+CRM,Salesforce,US,NYSE,雲端,SaaS,CRM;SaaS;企業軟體;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+TSLA,Tesla,US,NASDAQ,電動車,整車與能源,EV;電池;自動駕駛;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+RIVN,Rivian,US,NASDAQ,電動車,整車,EV;電動皮卡;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+GM,General Motors,US,NYSE,電動車,整車,EV;汽車;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+F,Ford,US,NYSE,電動車,整車,EV;汽車;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+NIO,NIO,US,NYSE,電動車,整車,EV;中國電動車;美股ADR,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+LI,Li Auto,US,NASDAQ,電動車,整車,EV;中國電動車;美股ADR,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+XPEV,Xpeng,US,NYSE,電動車,整車,EV;中國電動車;美股ADR,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+CRWD,CrowdStrike,US,NASDAQ,資安,端點防護,Cybersecurity;EDR;雲端安全;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+PANW,Palo Alto Networks,US,NASDAQ,資安,網路安全,Cybersecurity;防火牆;雲端安全;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+ZS,Zscaler,US,NASDAQ,資安,雲端安全,Cybersecurity;Zero Trust;SASE;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+FTNT,Fortinet,US,NASDAQ,資安,網路安全,Cybersecurity;防火牆;資安設備;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+OKTA,Okta,US,NASDAQ,資安,身分識別,Identity;Zero Trust;Cybersecurity;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+LLY,Eli Lilly,US,NYSE,生技醫療,製藥,減重藥;糖尿病;製藥;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+NVO,Novo Nordisk,US,NYSE,生技醫療,製藥,減重藥;糖尿病;製藥;美股ADR,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+MRK,Merck,US,NYSE,生技醫療,製藥,癌症用藥;疫苗;製藥;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+UNH,UnitedHealth,US,NYSE,生技醫療,醫療保險,Healthcare;保險;醫療服務;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+AMGN,Amgen,US,NASDAQ,生技醫療,生物製藥,Biotech;製藥;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+XOM,Exxon Mobil,US,NYSE,能源,石油天然氣,Oil;Gas;能源;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+CVX,Chevron,US,NYSE,能源,石油天然氣,Oil;Gas;能源;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+COP,ConocoPhillips,US,NYSE,能源,石油天然氣,Oil;Gas;能源;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+FSLR,First Solar,US,NASDAQ,綠能,太陽能,Solar;綠能;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+ENPH,Enphase Energy,US,NASDAQ,綠能,太陽能逆變器,Solar;儲能;逆變器;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+JPM,JPMorgan Chase,US,NYSE,金融,銀行,金融;銀行;投資銀行;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+BAC,Bank of America,US,NYSE,金融,銀行,金融;銀行;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+WFC,Wells Fargo,US,NYSE,金融,銀行,金融;銀行;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+MS,Morgan Stanley,US,NYSE,金融,投資銀行,金融;投資銀行;財富管理;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護
+GS,Goldman Sachs,US,NYSE,金融,投資銀行,金融;投資銀行;美股,manual_seed,概念股資料為研究用初始清單，請定期自行維護

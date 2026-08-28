@@ -1,0 +1,2 @@
+symbol,market,action_type,effective_date,available_date,payable_date,split_ratio,cash_per_share,currency,tax_rate,source,confidence,completeness,notes
+ABC,US,split,2024-01-03,2024-01-02,,2.0,,,0.0,synthetic-fixture,complete,partial,fixture only

@@ -1,0 +1,2 @@
+# Preserve the recovered baseline byte-for-byte; normalize line endings only in a later reviewed change.
+* -text

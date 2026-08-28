@@ -1,0 +1,4 @@
+symbol,market,effective_from,effective_to,status,source,dataset_completeness
+2330,TWSE,2024-01-01,,listed,synthetic-point-in-time-fixture,partial
+6488,TPEX,2024-03-01,,listed,synthetic-point-in-time-fixture,partial
+OLD,TWSE,2023-01-01,2024-02-15,delisted_placeholder,synthetic-point-in-time-fixture,partial

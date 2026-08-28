@@ -1,0 +1,71 @@
+{
+  "dataset_version": "sprint9-sample-v1",
+  "relations": [
+    {
+      "concept_key": "hbm",
+      "symbol": "MU",
+      "market": "US",
+      "relation_type": "core_manufacturing",
+      "evidence": "內建人工種子：記憶體產品研究候選，需以公司產品頁或公開文件再驗證。",
+      "confidence": 0.3,
+      "source_name": "manual_seed",
+      "source_url": null,
+      "verified_at": null
+    },
+    {
+      "concept_key": "hbm",
+      "symbol": "2330",
+      "market": "TWSE",
+      "relation_type": "indirect_beneficiary",
+      "evidence": "內建人工種子：AI 封裝整合需求關聯；不是 HBM 記憶體製造商。",
+      "confidence": 0.3,
+      "source_name": "manual_seed",
+      "source_url": null,
+      "verified_at": null
+    },
+    {
+      "concept_key": "advanced_packaging",
+      "symbol": "2330",
+      "market": "TWSE",
+      "relation_type": "core_manufacturing",
+      "evidence": "內建人工種子：先進封裝研究候選，需以公司公開技術資料驗證。",
+      "confidence": 0.3,
+      "source_name": "manual_seed",
+      "source_url": null,
+      "verified_at": null
+    },
+    {
+      "concept_key": "advanced_packaging",
+      "symbol": "NVDA",
+      "market": "US",
+      "relation_type": "downstream_demand",
+      "evidence": "內建人工種子：加速器設計與需求端候選，不是封裝代工廠。",
+      "confidence": 0.3,
+      "source_name": "manual_seed",
+      "source_url": null,
+      "verified_at": null
+    },
+    {
+      "concept_key": "cowos",
+      "symbol": "2330",
+      "market": "TWSE",
+      "relation_type": "core_manufacturing",
+      "evidence": "內建人工種子：CoWoS 研究候選，需以公司公開技術資料驗證。",
+      "confidence": 0.3,
+      "source_name": "manual_seed",
+      "source_url": null,
+      "verified_at": null
+    },
+    {
+      "concept_key": "humanoid_robot",
+      "symbol": "2049",
+      "market": "TWSE",
+      "relation_type": "equipment_materials",
+      "evidence": "內建人工種子：機器人傳動元件研究候選，需確認產品、客戶與營收占比。",
+      "confidence": 0.3,
+      "source_name": "manual_seed",
+      "source_url": null,
+      "verified_at": null
+    }
+  ]
+}

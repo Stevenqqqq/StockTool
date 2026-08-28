@@ -1,0 +1,28 @@
+{
+  "schema_version": 2,
+  "template": "Generated only for unsigned internal-test installer candidates.",
+  "required_fields": [
+    "product",
+    "version",
+    "channel",
+    "publisher",
+    "artifact_filename",
+    "size_bytes",
+    "sha256",
+    "created_at_utc",
+    "user_data_compatibility",
+    "rollback",
+    "rollback.artifact_filename",
+    "rollback.version",
+    "rollback.size_bytes",
+    "rollback.sha256",
+    "staging",
+    "staging.layout",
+    "staging.stable_entry.relative_path",
+    "staging.stable_entry.size_bytes",
+    "staging.stable_entry.sha256",
+    "staging.payload.relative_path",
+    "staging.payload.size_bytes",
+    "staging.payload.sha256"
+  ]
+}
