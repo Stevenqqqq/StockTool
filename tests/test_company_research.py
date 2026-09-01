@@ -76,6 +76,7 @@ def test_specific_company_identity_beats_broad_storage_word() -> None:
         },
     )
 
+    assert profile.company_name == "台積電"
     assert not any(token in _profile_text(profile) for token in ("NAND", "SSD", "DRAM"))
 
 

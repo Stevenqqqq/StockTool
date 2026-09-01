@@ -106,17 +106,18 @@ def estimate_entry_reference(
     )
     method = "區間觀察"
 
+    anchor: float = close
     if sma20 is not None and sma60 is not None and close >= sma20 >= sma60:
         method = "趨勢回檔觀察"
-        anchor = sma20
+        anchor = float(sma20)
         notes.append("收盤價、20 日均線與 60 日均線呈多頭排列，參考價以 20 日均線附近估算。")
     elif sma20 is not None and close >= sma20:
         method = "短線支撐觀察"
-        anchor = sma20
+        anchor = float(sma20)
         notes.append("收盤價高於 20 日均線，但中期趨勢條件未完全確認，參考價以短線支撐附近估算。")
     else:
         method = "保守觀察"
-        anchor = close
+        anchor = float(close)
         notes.append(
             "價格尚未站上主要均線，主參考價以最新收盤附近保守觀察；"
             "近高突破價另列為條件觀察，不作為主入場參考。"
@@ -124,8 +125,12 @@ def estimate_entry_reference(
 
     reference_price = _round_price(anchor)
     zone_low = _round_price(max(0.01, anchor - buffer * entry_atr_multiplier))
-    zone_high = _round_price(max(zone_low, anchor + buffer * entry_atr_multiplier))
-    stop_base = recent_low if recent_low is not None and recent_low < anchor else zone_low
+    zone_high = _round_price(max(zone_low or 0.01, anchor + buffer * entry_atr_multiplier))
+    stop_base: float = (
+        float(recent_low)
+        if (recent_low is not None and recent_low < anchor)
+        else (float(zone_low) if zone_low is not None else anchor)
+    )
     stop_loss_reference = _round_price(
         max(0.01, stop_base - buffer * min(stop_atr_multiplier, 1.0))
     )

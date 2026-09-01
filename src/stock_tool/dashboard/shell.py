@@ -141,6 +141,46 @@ def synchronize_existing_session_status(st: Any) -> None:
     st.session_state.dashboard_status_updated_at = source.get("end_date")
 
 
+_scroll_reset_component: Any = None
+try:
+    import streamlit.components.v2 as _components
+
+    _scroll_reset_component = _components.component(
+        "scroll_reset",
+        isolate_styles=False,
+        js="""
+        export default function scrollReset() {
+          const reset = () => {
+            const targets = document.querySelectorAll(
+              '[data-testid="stMain"], [data-testid="stAppViewContainer"], .main'
+            );
+            for (const target of targets) {
+              target.scrollTop = 0;
+              if (typeof target.scrollTo === 'function') target.scrollTo(0, 0);
+            }
+            document.documentElement.scrollTop = 0;
+            if (document.body) document.body.scrollTop = 0;
+            window.scrollTo(0, 0);
+          };
+          reset();
+          window.requestAnimationFrame(reset);
+          window.setTimeout(reset, 80);
+        }
+        """,
+    )
+except Exception:
+    _scroll_reset_component = None
+
+
+def _render_scroll_reset(st: Any, token: str) -> None:
+    """Safely reset page scroll to top on workspace transition."""
+    if _scroll_reset_component is not None:
+        try:
+            _scroll_reset_component(key=f"nav_scroll_reset_{token}")
+        except Exception:
+            pass
+
+
 def render_dashboard_shell(st: Any, dependencies: DashboardShellDependencies) -> None:
     """Render the six-workspace shell using existing legacy callbacks only."""
 
@@ -148,6 +188,13 @@ def render_dashboard_shell(st: Any, dependencies: DashboardShellDependencies) ->
     active_key = str(st.session_state.dashboard_active_workspace)
     item = render_primary_navigation(st, active_key=active_key)
     st.session_state.dashboard_active_workspace = item.key
+    previous_workspace = st.session_state.get("_last_rendered_workspace")
+    if previous_workspace != item.key:
+        import time as _time
+
+        st.session_state["_last_rendered_workspace"] = item.key
+        token = f"{item.key}_{int(_time.time() * 1000)}"
+        _render_scroll_reset(st, token)
     current_status = dashboard_status(st.session_state)
     if item.key != "home":
         render_dashboard_status(

@@ -290,7 +290,7 @@ def _verify_page_capture_contract(
         console = _load_json(console_path)
         if not isinstance(console, dict) or console.get("scene") != scene:
             raise ValueError(f"{scene} console descriptor is not scene-bound")
-        if console.get("errors") != []:
+        if console.get("errors") != [] or console.get("app_origin_warnings", []) != []:
             raise ValueError(f"{scene} active console contains errors")
         for name, raw in (
             (png_name, png_raw),
@@ -558,7 +558,11 @@ def _verify_macro_scenario(
     if "StockTool" not in paths["dom"].read_text(encoding="utf-8"):
         raise ValueError("macro DOM lacks StockTool content")
     console = _load_json(paths["console"])
-    if not isinstance(console, dict) or console.get("errors") != []:
+    if (
+        not isinstance(console, dict)
+        or console.get("errors") != []
+        or console.get("app_origin_warnings", []) != []
+    ):
         raise ValueError("macro active console contains errors")
     metadata = _load_json(paths["provider_metadata"])
     if not isinstance(metadata, dict) or metadata.get("coverage") != 6:
@@ -822,21 +826,55 @@ def _verify_keyboard_scenario(
     if not isinstance(steps, list) or len(steps) < 5:
         raise ValueError("keyboard navigation trace steps are incomplete")
 
-    actions = [s.get("action") for s in steps if isinstance(s, dict)]
-    if not any("tab" in str(a).lower() for a in actions):
-        raise ValueError("keyboard navigation trace missing Tab actions")
-    if not any(
-        "open" in str(a).lower() or "enter" in str(a).lower() or "space" in str(a).lower()
-        for a in actions
+    required_steps = [
+        step
+        for step in steps
+        if isinstance(step, dict) and step.get("is_required_stocktool_step", True) is True
+    ]
+    if not required_steps or not all(
+        step.get("is_valid_stocktool_step") is True for step in required_steps
     ):
-        raise ValueError("keyboard navigation trace missing Open action")
-    if not any(
-        "arrow" in str(a).lower() or "down" in str(a).lower() or "up" in str(a).lower()
-        for a in actions
+        raise ValueError("keyboard trace contains an invalid required StockTool step")
+
+    keys = {str(s.get("key")) for s in steps if isinstance(s, dict)}
+    required_keys = {"Tab", "ArrowDown", "Enter", "Space", "Shift+Tab"}
+    if not required_keys <= keys:
+        raise ValueError(f"keyboard navigation trace missing required keys: {required_keys - keys}")
+
+    shift_steps = [step for step in steps if step.get("key") == "Shift+Tab"]
+    if len(shift_steps) != 1:
+        raise ValueError("keyboard trace must contain one Shift+Tab step")
+    shift = shift_steps[0]
+    active = shift.get("active_element")
+    owner = shift.get("owner_label")
+    if not isinstance(active, dict):
+        raise ValueError("Shift+Tab active element is missing")
+    text = str(active.get("text") or "")
+    tag = str(active.get("tag") or "").lower()
+    rect = active.get("rect")
+    visible_owner = isinstance(owner, dict) and owner.get("is_visible") is True
+    positive_rect = (
+        isinstance(rect, dict)
+        and isinstance(rect.get("width"), (int, float))
+        and isinstance(rect.get("height"), (int, float))
+        and rect["width"] > 0
+        and rect["height"] > 0
+    )
+    if (
+        tag not in {"a", "button", "input", "select", "summary", "textarea"}
+        or text in {"Deploy", "Main menu", "Link to heading"}
+        or tag in {"body", "iframe", "section"}
+        or (not positive_rect and not visible_owner)
     ):
-        raise ValueError("keyboard navigation trace missing Arrow navigation action")
-    if not any("select" in str(a).lower() or "enter" in str(a).lower() for a in actions):
-        raise ValueError("keyboard navigation trace missing Select action")
+        raise ValueError("Shift+Tab did not land on a visible StockTool control")
+
+    space_steps = [step for step in steps if step.get("key") == "Space"]
+    if len(space_steps) != 1:
+        raise ValueError("keyboard trace must contain one Space step")
+    before = space_steps[0].get("before_state")
+    after = space_steps[0].get("after_state")
+    if not isinstance(before, dict) or not isinstance(after, dict) or before == after:
+        raise ValueError("Space step does not prove a before/after state change")
 
 
 def _verify_index(bundle_root: Path) -> None:

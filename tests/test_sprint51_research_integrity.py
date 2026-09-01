@@ -200,9 +200,10 @@ def test_ensure_symbol_data_preserves_actual_fetch_provenance(
     rendered = _FakeStreamlit()
     render_research_header(rendered, snapshot)
     rendered_text = "\n".join(str(value) for _, value in rendered.events)
-    assert (
-        f"資料來源：{source}；類型：{source_type}；實際查詢代號：{provider_symbol}" in rendered_text
-    )
+    from stock_tool.dashboard.presentation_mapper import format_status_label
+
+    type_zh = format_status_label(source_type)
+    assert f"資料來源：{source}；類型：{type_zh}；實際查詢代號：{provider_symbol}" in rendered_text
 
 
 def test_unrelated_backtest_is_not_passed_to_current_research_score(

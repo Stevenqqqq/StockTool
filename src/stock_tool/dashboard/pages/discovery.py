@@ -20,6 +20,15 @@ from stock_tool.application.market_monitor import (
     build_rankings,
     compute_breadth,
 )
+from stock_tool.dashboard.presentation_mapper import (
+    format_iso_datetime,
+    format_percentage,
+    format_source_state_label,
+    format_status_label,
+    format_taiwan_company_display,
+    format_turnover_value,
+    format_volume,
+)
 from stock_tool.domain.models import Symbol
 
 
@@ -78,13 +87,15 @@ def render_explore_workspace(
     on_research: Callable[[Symbol], None],
     market_service: MarketMonitorApplicationService | None = None,
 ) -> None:
-    """Render the usable Explore entry without duplicating domain decisions in UI."""
+    """Render the usable Explore entry with search as the prominent top entry."""
 
-    st.subheader("探索研究入口")
     st.caption("使用目前本機索引尋找標的；結果只供研究整理，不代表推薦、評級或買賣建議。")
+
+    # Primary entry: Search
     query = st.text_input(
         "股票代號、公司名稱或題材",
         key="explore_query",
+        placeholder="例如：2330、台積電、半導體、AI",
         help="可輸入 2330、台積電、半導體或既有題材關鍵字。",
     )
     markets = st.multiselect(
@@ -98,15 +109,18 @@ def render_explore_workspace(
         }.get(value, value),
         key="explore_markets",
     )
-    if market_service is not None:
-        _render_market_overview(st, market_service, on_research=on_research)
     if st.button("搜尋探索", key="explore_search", type="primary"):
         st.session_state["explore_result"] = service.search(query, markets=markets)
+
     result = st.session_state.get("explore_result")
-    if not isinstance(result, ExploreResult):
-        st.info("尚未搜尋。輸入條件後按「搜尋探索」，查看目前索引中可核對的結果。")
-        return
-    _render_explore_result(st, service, result, on_research=on_research)
+    if isinstance(result, ExploreResult):
+        _render_explore_result(st, service, result, on_research=on_research)
+    else:
+        st.info("輸入條件後按「搜尋探索」，即可查看目前索引中可核對的結果。")
+
+    # Secondary entry: Market Overview
+    if market_service is not None:
+        _render_market_overview(st, market_service, on_research=on_research)
 
 
 def _market_warning_label(warning: str) -> str:
@@ -144,7 +158,7 @@ def _render_market_overview(
     st.subheader("市場總覽")
     st.caption("盤後研究資料，不是即時行情、預測或投資建議。")
     st.caption(
-        "股票 universe 規則：只納入官方公司清單中的四碼普通股；ETF、權證、債券及其他商品排除。"
+        "選股母體範圍規則：只納入官方公司清單中的四碼普通股；ETF、權證、債券及其他商品排除。"
     )
     if st.button("更新盤後市場資料", key="market_monitor_refresh", type="secondary"):
         try:
@@ -173,10 +187,11 @@ def _render_market_overview(
         )
         or f"{metadata.market}：{metadata.data_date or '無資料'}"
     )
+    fetched_fmt = format_iso_datetime(metadata.fetched_at)
     st.caption(
-        f"來源：{metadata.source}；各來源資料日期：{source_dates}；"
-        f"更新時間：{metadata.fetched_at}；狀態：{_market_status_label(result.status)}；"
-        f"涵蓋率：{metadata.coverage:.2%}"
+        f"資料類別：市場官方盤後快照｜來源：{metadata.source}｜各來源資料日期：{source_dates}｜"
+        f"更新時間：{fetched_fmt}｜狀態：{_market_status_label(result.status)}｜"
+        f"涵蓋率：{metadata.coverage:.1%}"
     )
     warnings = tuple(dict.fromkeys(result.warnings + snapshot.warnings))
     if warnings:
@@ -192,9 +207,11 @@ def _render_market_overview(
     view = st.selectbox(
         "市場檢視",
         options=("TWSE", "TPEX", "COMBINED"),
-        format_func=lambda value: {"TWSE": "台股上市", "TPEX": "台股上櫃", "COMBINED": "合併"}.get(
-            value, value
-        ),
+        format_func=lambda value: {
+            "TWSE": "台股上市",
+            "TPEX": "台股上櫃",
+            "COMBINED": "合併檢視",
+        }.get(value, value),
         key="market_monitor_view",
     )
     rows = tuple(row for row in snapshot.quotes if view == "COMBINED" or row.market == view)
@@ -208,15 +225,15 @@ def _render_market_overview(
             "derived_only": "僅為自行推導",
         }.get(source.breadth_status, "僅為自行推導")
         st.caption(
-            f"{source.market} 股票 universe：普通股 {source.included_common_stock}；"
+            f"{source.market} 選股母體範圍：普通股 {source.included_common_stock}；"
             f"排除非股票商品 {source.excluded_non_stock}；"
             f"廣度：{breadth_label}"
         )
     breadth = snapshot.breadth if view == "COMBINED" else compute_breadth(rows)
     st.write(
-        f"上漲 {breadth.up}（{breadth.up_ratio:.2%}）／"
-        f"下跌 {breadth.down}（{breadth.down_ratio:.2%}）／"
-        f"平盤 {breadth.flat}（{breadth.flat_ratio:.2%}）／"
+        f"上漲 {breadth.up}（{breadth.up_ratio:.1%}）／"
+        f"下跌 {breadth.down}（{breadth.down_ratio:.1%}）／"
+        f"平盤 {breadth.flat}（{breadth.flat_ratio:.1%}）／"
         f"無法判斷 {breadth.unknown}；有效股票 {breadth.valid_total}"
     )
     labels = {
@@ -231,16 +248,26 @@ def _render_market_overview(
         if not entries:
             continue
         st.markdown(f"#### {label}")
-        for entry in entries:
+        for entry in entries[:5]:
             columns = st.columns((3, 2))
+            company_display = format_taiwan_company_display(
+                entry.symbol, entry.name, market=entry.market
+            )
+            if category in {"gainers", "losers"}:
+                val_str = format_percentage(entry.value, with_sign=True)
+            elif category == "volume":
+                val_str = format_volume(entry.value)
+            elif category == "value":
+                val_str = format_turnover_value(entry.value)
+            else:
+                val_str = f"{entry.value:g}"
+
             with columns[0]:
-                st.write(
-                    f"{entry.rank}. {entry.symbol} / {entry.market} "
-                    f"{entry.name or '資料不足'}：{entry.value:g}"
-                )
+                st.write(f"{entry.rank}. {company_display}（{entry.market}）：{val_str}")
             with columns[1]:
+                btn_label = f"研究 {entry.symbol} ({entry.name or entry.symbol})"
                 if st.button(
-                    "研究此標的",
+                    btn_label,
                     key=f"market_monitor_research_{category}_{entry.market}_{entry.symbol}",
                 ):
                     try:
@@ -248,15 +275,28 @@ def _render_market_overview(
                     except ValueError:
                         st.error("標的市場身分無法確認，已拒絕研究接力。")
     if snapshot.industry_heat:
-        st.markdown("#### 產業熱度（已分類股票子集合）")
         industry_rows = build_industry_heat(rows)
-        for row in industry_rows:
+        # Check if industry classification is meaningful or almost completely unclassified
+        total_rows_count = len(rows)
+        unclassified_count = sum(
+            r.total_components for r in industry_rows if r.industry == "未分類"
+        )
+        is_mostly_unclassified = total_rows_count > 0 and (
+            unclassified_count / total_rows_count > 0.8
+        )
+
+        st.markdown("#### 產業熱度（已分類股票子集合）")
+        if is_mostly_unclassified:
+            st.caption(
+                "目前產業分類大多為未分類狀態；待官方產業清單更新後將提供更詳細之產業板塊分析。"
+            )
+        for row in industry_rows[:8]:
             average = (
-                "無資料" if row.average_change_pct is None else f"{row.average_change_pct:.2f}%"
+                "無資料" if row.average_change_pct is None else f"{row.average_change_pct:+.2f}%"
             )
             st.write(
                 f"{row.industry}：成分 {row.total_components}、有效 {row.valid_samples}、"
-                f"涵蓋率 {row.coverage:.2%}、等權平均 {average}；"
+                f"涵蓋率 {row.coverage:.1%}、等權平均 {average}；"
                 f"上漲 {row.up}/下跌 {row.down}/平盤 {row.flat}"
             )
 
@@ -280,11 +320,10 @@ def _render_explore_result(
     """Render one result set with explicit freshness/source and safe actions."""
 
     if result.source:
-        updated = result.updated_at or "無資料"
-        time_label = "索引檔更新時間" if result.source_state == "local_index" else "更新時間"
+        updated = format_iso_datetime(result.updated_at)
         st.caption(
-            f"資料來源：{result.source}；{time_label}：{updated}；"
-            f"狀態：{_status_label(result.status)}；來源模式：{_source_state_label(result.source_state)}"
+            f"資料類別：本機探索索引｜來源：{result.source}｜索引更新時間：{updated}｜"
+            f"狀態：{_status_label(result.status)}｜模式：{_source_state_label(result.source_state)}"
         )
     for warning in result.warnings:
         st.warning(warning)
@@ -296,18 +335,18 @@ def _render_explore_result(
     for index, row in result.matches.iterrows():
         symbol = str(row.get("symbol", "")).strip()
         market = str(row.get("market", "")).strip()
-        name = str(row.get("name", "")).strip() or "資料不足"
+        raw_name = str(row.get("name", "")).strip()
+        display_title = format_taiwan_company_display(symbol, raw_name, market=market)
         with st.container(border=True):
-            st.markdown(f"#### {symbol or '資料不足'} · {name}")
+            st.markdown(f"#### {display_title}")
             st.caption(
-                f"市場：{row.get('market_label') or market or '資料不足'}；"
-                f"出現原因：{row.get('match_reason') or '資料不足'}"
+                f"市場：{row.get('market_label') or market or '資料不足'}｜"
+                f"相符原因：{row.get('match_reason') or '符合索引條件'}"
             )
             st.caption(
-                f"來源：{row.get('source') or '資料不足'}；"
-                f"狀態：{_status_label(str(row.get('display_status') or result.status))}；"
-                f"來源模式：{_source_state_label(result.source_state)}；"
-                f"索引檔更新時間：{result.updated_at or '無資料'}"
+                f"來源：{row.get('source') or '資料不足'}｜"
+                f"狀態：{_status_label(str(row.get('display_status') or result.status))}｜"
+                f"索引更新時間：{format_iso_datetime(result.updated_at)}"
             )
             if row.get("note"):
                 st.caption(str(row["note"]))
@@ -346,28 +385,15 @@ def _render_explore_result(
                     else:
                         st.session_state.watchlist = service.current_watchlist()
                         action = "移除" if in_watchlist else "加入"
-                        st.success(f"已{action}自選股：{symbol}（{market}）。")
+                        st.success(f"已{action}自選股：{display_title}。")
                         rerun = getattr(st, "rerun", None)
                         if callable(rerun):
                             rerun()
 
 
 def _status_label(status: str) -> str:
-    return {
-        "initial": "尚未搜尋",
-        "no_results": "無結果",
-        "fresh": "最新",
-        "stale": "可能過期",
-        "partial": "部分資料",
-        "missing": "資料不足",
-        "offline": "離線／本機資料",
-    }.get(status, "資料不足")
+    return format_status_label(status)
 
 
 def _source_state_label(state: str) -> str:
-    return {
-        "offline_cache": "離線／本機快取",
-        "local_index": "本機索引",
-        "missing": "資料不足",
-        "provider": "線上來源",
-    }.get(state, "資料不足")
+    return format_source_state_label(state)

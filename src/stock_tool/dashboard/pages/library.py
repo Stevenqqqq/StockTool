@@ -13,6 +13,27 @@ from stock_tool.research.library import (
 )
 
 
+from stock_tool.dashboard.presentation_mapper import format_iso_datetime, format_status_label
+
+
+def _safe_expander(st: Any, label: str, expanded: bool = False) -> Any:
+    expander = getattr(st, "expander", None)
+    if callable(expander):
+        try:
+            return expander(label, expanded=expanded)
+        except TypeError:
+            return expander(label)
+    return _null_context()
+
+
+class _null_context:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+
 def _display_optional_text(value: object) -> str:
     """Render missing saved metadata without exposing Python's None sentinel."""
 
@@ -36,7 +57,6 @@ def render_library_workspace(
     if library is None:
         return force_refresh
 
-    st.subheader("研究庫")
     st.caption("研究庫保存可驗證的研究版本；查看保存版本不會抓取目前市場資料。")
     symbol = st.text_input("代號篩選", key="library_symbol_filter")
     market = st.selectbox("市場篩選", ("", "TWSE", "TPEX", "US"), key="library_market_filter")
@@ -45,13 +65,23 @@ def render_library_workspace(
     for warning in library.warnings:
         st.warning(warning)
     if not entries:
-        st.info("目前沒有符合條件的保存研究版本。")
+        if symbol or market or title:
+            st.info("沒有符合篩選條件的研究版本。請清除代號、市場或標題條件。")
+        else:
+            st.info(
+                "研究庫目前尚無保存的研究版本。\n\n"
+                "💡 如何保存第一份研究：\n"
+                "1. 前往「個股研究」工作區輸入欲研究之股票代號。\n"
+                "2. 檢視各項分析指標與證據。\n"
+                "3. 點選頁面底部的「儲存研究至研究庫」即可建立不可篡改之研究版本。"
+            )
 
     for entry in entries:
         with st.expander(f"{entry.title}｜{entry.symbol}（{entry.market}）｜版本 {entry.version}"):
+            created_fmt = format_iso_datetime(entry.created_at)
             st.caption(
-                f"保存時間：{_display_optional_text(entry.created_at)}｜資料截至：{_display_optional_text(entry.data_as_of)}｜"
-                f"模式：{_display_optional_text(entry.note.mode)}｜覆蓋率：{_display_optional_text(entry.note.coverage)}"
+                f"保存時間：{created_fmt}｜資料截至：{_display_optional_text(entry.data_as_of)}｜"
+                f"模式：{format_status_label(str(entry.note.mode))}｜覆蓋率：{_display_optional_text(entry.note.coverage)}"
             )
             st.write("資料來源：" + ("、".join(entry.sources) or "無資料"))
             for warning in (*entry.note.warnings, *entry.note.missing_data):
@@ -63,8 +93,6 @@ def render_library_workspace(
                 if on_current_research is not None:
                     on_current_research(entry.symbol, entry.market)
                 else:
-                    # Compatibility path for isolated callers; the dashboard
-                    # shell uses the typed handoff callback above.
                     st.session_state["dashboard_library_current_research"] = {
                         "symbol": entry.symbol,
                         "market": entry.market,
@@ -93,30 +121,32 @@ def render_library_workspace(
                 st.session_state.pop("dashboard_library_saved_entry_id", None)
                 st.rerun()
 
-    st.divider()
-    st.caption(
-        "備份只包含研究庫 JSON 與文件引用 metadata，不包含文件內容、持股、自選股或行情快取。"
-    )
-    if st.button("建立研究庫備份", key="library_backup"):
-        backup = library.create_backup(
-            library.directory.parent / "backups" / "research-library-backup.zip"
+    with _safe_expander(st, "研究庫備份與還原", expanded=False):
+        st.caption(
+            "備份只包含研究庫 JSON 與文件引用 metadata，不包含文件內容、持股、自選股或行情快取。"
         )
-        st.success(f"備份完成：{backup.archive_path.name}")
-    uploaded = st.file_uploader("選擇研究庫備份", type=["zip"], key="library_restore_upload")
-    if (
-        uploaded is not None
-        and st.checkbox("確認還原研究庫備份", key="library_restore_confirm")
-        and st.button("還原研究庫備份", key="library_restore")
-    ):
-        candidate = library.directory.parent / ".research-library-restore-upload.zip"
-        candidate.write_bytes(uploaded.getvalue())
-        try:
-            library.restore(candidate)
-            st.success("研究庫備份還原完成。")
-        except ResearchLibraryRestoreError:
-            st.error("研究庫備份驗證失敗，現有資料未被取代。")
-        finally:
-            candidate.unlink(missing_ok=True)
+        if st.button("建立研究庫備份", key="library_backup"):
+            backup = library.create_backup(
+                library.directory.parent / "backups" / "research-library-backup.zip"
+            )
+            st.success(f"備份完成：{backup.archive_path.name}")
+        uploaded = st.file_uploader(
+            "選擇研究庫備份檔 (.zip)", type=["zip"], key="library_restore_upload"
+        )
+        if (
+            uploaded is not None
+            and st.checkbox("我確認要還原此研究庫備份", key="library_restore_confirm")
+            and st.button("確認執行還原", key="library_restore")
+        ):
+            candidate = library.directory.parent / ".research-library-restore-upload.zip"
+            candidate.write_bytes(uploaded.getvalue())
+            try:
+                library.restore(candidate)
+                st.success("研究庫備份還原完成。")
+            except ResearchLibraryRestoreError:
+                st.error("研究庫備份驗證失敗，現有資料未被取代。")
+            finally:
+                candidate.unlink(missing_ok=True)
     return force_refresh
 
 

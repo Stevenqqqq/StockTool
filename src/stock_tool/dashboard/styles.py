@@ -105,6 +105,30 @@ section[data-testid="stSidebar"] {{
 }}
 section[data-testid="stSidebar"] > div:first-child {{ padding: 1.25rem 1rem; }}
 section[data-testid="stSidebar"] hr {{ border-color: var(--stocktool-border); }}
+.stocktool-brand-link {{
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.4rem;
+  color: var(--stocktool-text) !important;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none !important;
+}}
+.stocktool-brand-link:focus-visible {{
+  border-radius: 0.4rem;
+  outline: 3px solid var(--stocktool-focus);
+  outline-offset: 3px;
+}}
+.stocktool-main-anchor {{
+  display: block;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}}
+a[aria-label="Link to heading"] {{
+  display: none !important;
+}}
 
 .main .block-container {{
   box-sizing: border-box;
@@ -130,12 +154,13 @@ p, label, small, [data-testid="stCaptionContainer"] {{
 /* StockTool workspace header: hierarchy comes from alignment and whitespace,
    not another heavy card. */
 .st-ui-workspace-header {{
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(12rem, auto);
-  gap: 1.25rem;
-  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
   min-width: 0;
-  padding: 0.4rem 0 1.35rem;
+  padding: 0.4rem 0 1.25rem;
   margin-bottom: 1rem;
   border-bottom: 1px solid var(--stocktool-border);
 }}
@@ -150,10 +175,10 @@ p, label, small, [data-testid="stCaptionContainer"] {{
 }}
 .st-ui-workspace-header p {{ margin: 0; color: var(--stocktool-muted); }}
 .st-ui-workspace-header__meta {{
-  display: grid;
-  grid-template-columns: auto auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: end;
+  justify-content: flex-end;
   gap: 0.35rem 0.65rem;
   text-align: right;
 }}
@@ -166,8 +191,6 @@ p, label, small, [data-testid="stCaptionContainer"] {{
   letter-spacing: 0.11em;
 }}
 .st-ui-badge {{
-  grid-column: 1 / -1;
-  justify-self: end;
   display: inline-flex;
   align-items: center;
   width: fit-content;
@@ -184,6 +207,7 @@ p, label, small, [data-testid="stCaptionContainer"] {{
 .st-key-home_command_panel {{
   box-sizing: border-box;
   min-width: 0;
+  max-width: 100%;
   padding: 1.2rem 1.25rem 1.1rem;
   margin-bottom: 1.5rem;
   background: var(--stocktool-surface);
@@ -197,7 +221,7 @@ p, label, small, [data-testid="stCaptionContainer"] {{
 .st-ui-section-header p {{ margin: 0; color: var(--stocktool-muted); }}
 .st-key-home_command_panel div[data-testid="stForm"] [data-testid="stVerticalBlock"] {{
   display: grid;
-  grid-template-columns: minmax(12rem, 1.2fr) minmax(12rem, 0.9fr) minmax(10rem, 0.55fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
   gap: 0.85rem;
   align-items: end;
 }}
@@ -215,7 +239,7 @@ p, label, small, [data-testid="stCaptionContainer"] {{
 }}
 .st-ui-stat-grid {{
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
   gap: 0.75rem;
   min-width: 0;
 }}
@@ -225,6 +249,7 @@ p, label, small, [data-testid="stCaptionContainer"] {{
   flex-direction: column;
   gap: 0.2rem;
   min-width: 0;
+  box-sizing: border-box;
   padding: 0.75rem 0.85rem;
   background: var(--stocktool-surface-muted);
   border-top: 2px solid var(--stocktool-border-strong);
@@ -276,6 +301,34 @@ p, label, small, [data-testid="stCaptionContainer"] {{
   font-weight: 700;
 }}
 
+.st-ui-danger-panel {{
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr);
+  gap: 0.85rem;
+  min-width: 0;
+  margin: 1rem 0;
+  padding: 0.9rem 1rem;
+  background: rgba(228, 119, 131, 0.08);
+  border: 1px solid rgba(228, 119, 131, 0.35);
+  border-radius: var(--stocktool-radius-md);
+  color: var(--stocktool-error);
+}}
+.st-ui-danger-panel__marker {{ border-radius: 99px; background: var(--stocktool-error); }}
+.st-ui-danger-panel strong {{ color: var(--stocktool-error); font-size: 0.95rem; }}
+.st-ui-danger-panel p {{ margin: 0.2rem 0 0; color: var(--stocktool-muted); font-size: 0.88rem; }}
+.st-ui-danger-panel__note {{ color: var(--stocktool-error) !important; font-size: 0.8rem; font-weight: 600; }}
+
+.st-ui-action-banner {{
+  min-width: 0;
+  margin: 0.8rem 0 1.2rem;
+  padding: 1rem 1.2rem;
+  background: var(--stocktool-surface);
+  border: 1px solid var(--stocktool-border);
+  border-radius: var(--stocktool-radius-md);
+}}
+.st-ui-action-banner h3 {{ margin: 0 0 0.3rem; font-size: 1.05rem; }}
+.st-ui-action-banner p {{ margin: 0; color: var(--stocktool-muted); font-size: 0.9rem; }}
+
 .st-key-home_prediction_lab {{
   min-width: 0;
   margin: 1.8rem 0 0.5rem;
@@ -290,7 +343,7 @@ p, label, small, [data-testid="stCaptionContainer"] {{
 .st-ui-outcome-matrix {{ margin-top: 1rem; min-width: 0; }}
 .st-ui-outcome-grid {{
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   gap: 0.75rem;
 }}
 .st-ui-outcome-row {{
@@ -317,16 +370,21 @@ p, label, small, [data-testid="stCaptionContainer"] {{
 .st-ui-outcome-cell span {{ color: var(--stocktool-muted); font-size: 0.76rem; }}
 .st-ui-outcome-cell strong {{ color: var(--stocktool-text); font-variant-numeric: tabular-nums; }}
 
-/* Existing lower-page Streamlit columns may wrap; no four/five-card strip is
-   forced into an unreadable narrow row. */
-div[data-testid="stHorizontalBlock"] {{ flex-wrap: wrap; gap: 0.8rem; }}
+/* Existing lower-page Streamlit columns wrap cleanly across all zoom levels */
+div[data-testid="stHorizontalBlock"] {{
+  flex-wrap: wrap !important;
+  gap: 0.8rem;
+  min-width: 0;
+}}
 div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {{
-  flex: 1 1 14rem !important;
+  flex: 1 1 min(100%, 12rem) !important;
   width: auto !important;
-  min-width: min(100%, 14rem);
+  min-width: 0 !important;
+  box-sizing: border-box;
 }}
 div[data-testid="stMetric"] {{
   min-width: 0;
+  box-sizing: border-box;
   padding: 0.7rem 0.8rem;
   background: var(--stocktool-surface-muted);
   border-bottom: 1px solid var(--stocktool-border);
@@ -337,6 +395,7 @@ div[data-testid="stMetricValue"] {{ color: var(--stocktool-text); font-variant-n
 
 div[data-testid="stVerticalBlockBorderWrapper"] {{
   min-width: 0;
+  box-sizing: border-box;
   background: var(--stocktool-surface-muted);
   border: 1px solid var(--stocktool-border);
   border-radius: var(--stocktool-radius-md);
@@ -420,21 +479,15 @@ textarea:focus-visible,
 
 @media (max-width: 900px) {{
   .main .block-container {{ padding-inline: 1rem; }}
-  .st-ui-workspace-header {{ grid-template-columns: minmax(0, 1fr); align-items: start; }}
-  .st-ui-workspace-header__meta {{ justify-content: start; text-align: left; }}
-  .st-ui-badge {{ justify-self: start; }}
+  .st-ui-workspace-header {{ flex-direction: column; align-items: flex-start; }}
+  .st-ui-workspace-header__meta {{ justify-content: flex-start; text-align: left; }}
+  .st-ui-badge {{ justify-self: flex-start; }}
   .st-ui-stat-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-  .st-key-home_command_panel div[data-testid="stForm"] [data-testid="stVerticalBlock"] {{
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }}
-  .st-key-home_command_panel div[data-testid="stFormSubmitButton"] {{ grid-column: 1 / -1; }}
-  .st-key-home_command_panel div[data-testid="stFormSubmitButton"] > button {{ width: 100%; }}
 }}
 
 @media (max-width: 600px) {{
   .main .block-container {{ padding-top: 1rem; padding-bottom: 2rem; }}
   .st-key-home_command_panel {{ padding: 1rem; }}
-  .st-key-home_command_panel div[data-testid="stForm"] [data-testid="stVerticalBlock"],
   .st-ui-stat-grid,
   .st-ui-outcome-grid {{ grid-template-columns: minmax(0, 1fr); }}
   .st-ui-outcome-values {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}

@@ -40,6 +40,15 @@ from stock_tool.dashboard.components.research_assistant import (
 from stock_tool.research.assistant import DailyResearchAssistantBrief
 from stock_tool.dashboard.state import DashboardStatus, SearchPreparation, SearchRequest
 
+from stock_tool.dashboard.presentation_mapper import (
+    deduplicate_warnings,
+    format_iso_datetime,
+    format_source_state_label,
+    format_status_label,
+    format_taiwan_company_display,
+    get_next_trading_date,
+)
+
 HomeActionKind = Literal[
     "search",
     "refresh",
@@ -170,6 +179,7 @@ def _render_home_overview_header(
     data_as_of = (
         brief.data_as_of_date if brief is not None and brief.data_as_of_date else context.updated_at
     )
+    formatted_date = format_iso_datetime(data_as_of) if data_as_of else "資料不足"
     render_ui_markup(
         st,
         workspace_header_markup(
@@ -177,7 +187,7 @@ def _render_home_overview_header(
             subtitle="先掌握資料狀態，再決定今天需要研究什麼。",
             status_label=_home_status_label(context.status),
             status_tone=_home_status_tone(context.status),
-            data_as_of=data_as_of or "資料不足",
+            data_as_of=formatted_date,
         ),
     )
     state_copy = _home_state_copy(context.status)
@@ -222,23 +232,36 @@ def _home_summary_statistics(context: HomeContext) -> tuple[CompactStatistic, ..
     )
 
 
+def _safe_expander(st: Any, label: str, expanded: bool = False) -> Any:
+    """Safely obtain an expander context manager, falling back to a null context."""
+    expander = getattr(st, "expander", None)
+    if callable(expander):
+        try:
+            return expander(label, expanded=expanded)
+        except TypeError:
+            return expander(label)
+    return _null_context()
+
+
 def render_home(st: Any, context: HomeContext) -> HomeAction | None:
-    """Render the daily research entry point without calculating or fetching data."""
+    """Render the daily research entry point in a clean 3-tier hierarchy."""
 
     brief = context.daily_brief
     _render_home_overview_header(st, context, brief)
 
+    # -------------------------------------------------------------
+    # Tier 1: 今天需要處理 (Actionable Items & Search)
+    # -------------------------------------------------------------
+    render_ui_markup(
+        st,
+        section_header_markup(
+            eyebrow="第一層",
+            title="今天需要處理",
+            description="搜尋標的、執行今日研究流程，並處理需要留意的項目。",
+        ),
+    )
+
     with st.container(border=False, key="home_command_panel"):
-        render_ui_markup(
-            st,
-            '<div class="st-ui-command-panel">'
-            + section_header_markup(
-                eyebrow="研究指令",
-                title="研究一家公司",
-                description="選擇市場與代號後進入研究；更新資料只會在你明確操作時執行。",
-            )
-            + "</div>",
-        )
         preparation = render_global_search(
             st,
             key_prefix="home",
@@ -246,45 +269,100 @@ def render_home(st: Any, context: HomeContext) -> HomeAction | None:
             default_symbol=context.active_symbol or "",
             submit_label="研究一家公司",
         )
-        if st.button(
-            "執行今日研究",
-            key="home_run_daily_research",
-            type="primary",
-            disabled=context.status is DashboardStatus.LOADING,
-        ):
-            return HomeAction(kind="daily_research_run")
-        if st.button(
-            "更新今日資料",
-            key="home_refresh_today",
-            disabled=context.status is DashboardStatus.LOADING,
-        ):
-            return HomeAction(kind="refresh")
-        render_ui_markup(
-            st,
-            statistic_group_markup(
-                title="研究狀態摘要",
-                statistics=_home_summary_statistics(context),
-                variant="summary",
-            ),
-        )
+        action_cols = st.columns(2)
+        with action_cols[0]:
+            if st.button(
+                "執行今日研究",
+                key="home_run_daily_research",
+                type="primary",
+                disabled=context.status is DashboardStatus.LOADING,
+            ):
+                return HomeAction(kind="daily_research_run")
+        with action_cols[1]:
+            if st.button(
+                "更新今日資料",
+                key="home_refresh_today",
+                disabled=context.status is DashboardStatus.LOADING,
+            ):
+                return HomeAction(kind="refresh")
+
         if context.source_label:
             st.caption(
-                f"目前來源：{context.source_label}｜更新資訊：{context.updated_at or '資料不足'}"
+                f"目前來源：{format_status_label(context.source_label)}｜更新時間：{format_iso_datetime(context.updated_at)}"
             )
     if preparation is not None:
         return HomeAction(kind="search", preparation=preparation)
 
-    _render_daily_research_run(st, context.daily_research_run)
+    loop_state: _DailyLoopRenderState | None = None
+    if brief is not None and not brief.first_use:
+        loop_state = _render_daily_research_loop(st, context.daily_research_loop)
+        if loop_state.action is not None:
+            return loop_state.action
+        action = _render_attention(
+            st,
+            brief.attention_items,
+            suppressed_keys=loop_state.represented_keys,
+        )
+        if action is not None:
+            return action
 
     _render_daily_changes(st, context.daily_research_changes)
 
-    lab_action = _render_prediction_lab(
+    # -------------------------------------------------------------
+    # Tier 2: 目前狀態 (Current State Overview)
+    # -------------------------------------------------------------
+    render_ui_markup(
         st,
-        context.prediction_lab,
-        evaluate_available=context.prediction_lab_evaluation_available,
+        section_header_markup(
+            eyebrow="第二層",
+            title="目前狀態",
+            description="持股與自選股動態、總經背景與預測評估實驗室進度。",
+        ),
     )
-    if lab_action is not None:
-        return lab_action
+
+    render_ui_markup(
+        st,
+        statistic_group_markup(
+            title="研究狀態摘要",
+            statistics=_home_summary_statistics(context),
+            variant="summary",
+        ),
+    )
+
+    if brief is None:
+        fallback_action = _render_legacy_fallback(st, context)
+        if fallback_action is not None:
+            return fallback_action
+    elif brief.first_use:
+        first_use_action = _render_first_use(st, context)
+        if first_use_action is not None:
+            return first_use_action
+    else:
+        suppressed_keys = loop_state.represented_keys if loop_state is not None else frozenset()
+        suppressed_actions = (
+            loop_state.represented_actions if loop_state is not None else frozenset()
+        )
+        port_action = _render_portfolio_pulse(
+            st,
+            brief,
+            suppress_view_holdings="view_holdings" in suppressed_actions,
+            suppressed_keys=suppressed_keys,
+        )
+        if port_action is not None:
+            return port_action
+        watch_action = _render_watchlist_pulse(st, brief)
+        if watch_action is not None:
+            return watch_action
+        cont_action = _render_continuations(st, brief.continuations)
+        if cont_action is not None:
+            return cont_action
+        req_action = _render_action_required(
+            st,
+            brief.action_required,
+            suppressed_keys=suppressed_keys,
+        )
+        if req_action is not None:
+            return req_action
 
     macro_action = _render_macro_background(
         st,
@@ -296,6 +374,45 @@ def render_home(st: Any, context: HomeContext) -> HomeAction | None:
     if macro_action is not None:
         return macro_action
 
+    lab_action = _render_prediction_lab(
+        st,
+        context.prediction_lab,
+        evaluate_available=context.prediction_lab_evaluation_available,
+    )
+    if lab_action is not None:
+        return lab_action
+
+    if brief is not None and not brief.first_use:
+        assistant_action = render_research_assistant(
+            st,
+            context.research_assistant_brief,
+            can_generate=context.research_assistant_available,
+        )
+        if assistant_action is not None:
+            return _home_action_from_assistant(assistant_action)
+
+    # -------------------------------------------------------------
+    # Tier 3: 詳細證據與歷史 (Detailed Evidence & History)
+    # -------------------------------------------------------------
+    render_ui_markup(
+        st,
+        section_header_markup(
+            eyebrow="第三層",
+            title="詳細證據與歷史",
+            description="收件匣歷史、研究執行階段明細與證據簡報下載。",
+        ),
+    )
+
+    with _safe_expander(st, "每日研究執行狀態與階段明細", expanded=False):
+        _render_daily_research_run(st, context.daily_research_run)
+
+    with _safe_expander(st, "每日研究收件匣歷史", expanded=False):
+        _render_daily_research_inbox(
+            st,
+            context.daily_research_inbox,
+            context.daily_research_inbox_brief,
+        )
+
     evidence_action = _render_daily_evidence_brief(
         st,
         context.daily_evidence_brief,
@@ -304,58 +421,13 @@ def render_home(st: Any, context: HomeContext) -> HomeAction | None:
     if evidence_action is not None:
         return evidence_action
 
-    _render_daily_research_inbox(
-        st,
-        context.daily_research_inbox,
-        context.daily_research_inbox_brief,
-    )
-
-    if brief is None:
-        return _render_legacy_fallback(st, context)
-    if brief.first_use:
-        return _render_first_use(st, context)
-
-    loop_state = _render_daily_research_loop(st, context.daily_research_loop)
-    if loop_state.action is not None:
-        return loop_state.action
-    assistant_action = render_research_assistant(
-        st,
-        context.research_assistant_brief,
-        can_generate=context.research_assistant_available,
-    )
-    if assistant_action is not None:
-        return _home_action_from_assistant(assistant_action)
-    action = _render_attention(
-        st,
-        brief.attention_items,
-        suppressed_keys=loop_state.represented_keys,
-    )
-    if action is not None:
-        return action
-    action = _render_portfolio_pulse(
-        st,
-        brief,
-        suppress_view_holdings="view_holdings" in loop_state.represented_actions,
-        suppressed_keys=loop_state.represented_keys,
-    )
-    if action is not None:
-        return action
-    action = _render_watchlist_pulse(st, brief)
-    if action is not None:
-        return action
-    action = _render_continuations(st, brief.continuations)
-    if action is not None:
-        return action
-    action = _render_action_required(
-        st,
-        brief.action_required,
-        suppressed_keys=loop_state.represented_keys,
-    )
-    if action is not None:
-        return action
-
-    for warning in context.summary_warnings:
+    for warning in deduplicate_warnings(context.summary_warnings):
+        if "0" in warning and "風險" in warning:
+            continue
+        if "100%" in warning and "覆蓋" in warning:
+            continue
         st.info(warning)
+
     st.warning("本工具僅供研究、學習與風險分析；不構成個人化投資建議。")
     return None
 
@@ -366,7 +438,7 @@ def _render_prediction_lab(
     *,
     evaluate_available: bool = False,
 ) -> HomeAction | None:
-    """Render the read-only Phase 0 experiment without implying a forecast."""
+    """Render the read-only Phase 0 experiment with verified calendar-based next trading day."""
 
     with st.container(border=False, key="home_prediction_lab"):
         render_ui_markup(
@@ -390,17 +462,26 @@ def _render_prediction_lab(
                 ),
             )
             return None
+
+        # Derive next trading day strictly from verified trading calendar
+        next_trading_day = (
+            get_next_trading_date("TWSE", as_of_date=summary.last_trading_date)
+            if summary.last_trading_date
+            else None
+        )
+        trading_day_note = (
+            f"最近交易日：{summary.last_trading_date}｜下一交易日：{next_trading_day or '無法判定'}"
+            if summary.last_trading_date
+            else "最近交易日資料不足"
+        )
+
         render_ui_markup(
             st,
             state_panel_markup(
                 tone="success" if summary.status == "ready" else "warning",
                 title="實驗狀態",
                 message=summary.message,
-                next_step=(
-                    f"最近交易日：{summary.last_trading_date}"
-                    if summary.last_trading_date
-                    else "最近交易日資料不足"
-                ),
+                next_step=trading_day_note,
             ),
         )
         render_ui_markup(
@@ -516,15 +597,10 @@ def _render_prediction_lab(
                     variant="summary",
                 ),
             )
-        for warning in summary.warnings:
+        for warning in deduplicate_warnings(summary.warnings):
             st.warning(warning)
         if summary.limitations:
-            expander = getattr(st, "expander", None)
-            if callable(expander):
-                with expander("實驗限制與資料說明"):
-                    for limitation in summary.limitations:
-                        st.caption(limitation)
-            else:
+            with _safe_expander(st, "實驗限制與資料說明", expanded=False):
                 for limitation in summary.limitations:
                     st.caption(limitation)
         return None
@@ -534,6 +610,7 @@ def _render_daily_research_run(st: Any, manifest: DailyResearchRunManifest | Non
     """Show the latest one-click run without exposing implementation details."""
 
     if manifest is None:
+        st.info("尚未有今日研究執行紀錄。")
         return
     st.subheader("今日研究執行狀態")
     status_labels = {
@@ -542,8 +619,9 @@ def _render_daily_research_run(st: Any, manifest: DailyResearchRunManifest | Non
         "failed": "未完成",
         "already_running": "已有執行中流程",
     }
+    completed_str = format_iso_datetime(manifest.completed_at)
     st.caption(
-        f"最近一次：{manifest.completed_at}｜狀態：{status_labels.get(manifest.status, '已略過')}"
+        f"最近一次執行：{completed_str}｜整體狀態：{status_labels.get(manifest.status, '已略過')}"
     )
     stage_labels = {
         "target_refresh": "研究標的",
@@ -556,13 +634,6 @@ def _render_daily_research_run(st: Any, manifest: DailyResearchRunManifest | Non
     }
 
     def user_reason(stage_name: str, status: str) -> str:
-        """Translate provider/engine diagnostics into short user guidance.
-
-        The raw reason remains in the run manifest/evidence; the home page only
-        exposes a stable, non-technical next step so provider details cannot
-        leak into the primary workflow.
-        """
-
         if stage_name == "market_refresh":
             return "部分市場資料暫時無法更新，已保留上一份成功結果。"
         if stage_name == "brief":
@@ -585,7 +656,9 @@ def _render_daily_research_run(st: Any, manifest: DailyResearchRunManifest | Non
             "unavailable": "不可用",
             "failure": "失敗",
         }
-        st.write(f"{stage_labels.get(stage.name, stage.name)}：{labels[stage.status]}")
+        st.write(
+            f"{stage_labels.get(stage.name, stage.name)}：{labels.get(stage.status, stage.status)}"
+        )
         if stage.reason and stage.status not in {"success", "skipped"}:
             st.caption(user_reason(stage.name, stage.status))
     if manifest.status != "success":
@@ -599,18 +672,26 @@ def _render_macro_background(
     links: tuple[dict[str, object], ...] = (),
     revisions: tuple[dict[str, object], ...] = (),
 ) -> HomeAction | None:
-    """Render validated macro context without triggering network activity."""
+    """Render validated macro context in natural Traditional Chinese without network activity."""
 
     st.subheader("今日總經背景")
     st.caption("僅呈現官方資料與可重播規則結果，不是即時行情、預測或投資建議。")
     if snapshot is None:
         st.info("尚未載入總經背景；按下更新後才會取得官方資料。")
     else:
-        labels = {
-            "ready": "可用",
+        status_labels = {
+            "ready": "資料已就緒",
             "partial": "部分資料",
             "stale": "沿用過期快照",
             "unavailable": "目前不可用",
+        }
+        signal_status_labels = {
+            "rising": "溫和上升",
+            "falling": "持續回落",
+            "unchanged": "維持穩定",
+            "revised": "數據已修訂",
+            "stale": "資料過期",
+            "unavailable": "資料不足",
         }
         latest_period = max(
             (signal.observation_period for signal in signals if signal.observation_period),
@@ -618,43 +699,45 @@ def _render_macro_background(
         )
         st.caption(
             f"各指標資料期間不同；最新一項截至 {latest_period or '無資料'}｜"
-            f"狀態：{labels.get(snapshot.status, '資料不足')}｜來源：{snapshot.source}"
+            f"狀態：{status_labels.get(snapshot.status, '資料不足')}｜來源：{snapshot.source}"
         )
         if snapshot.status in {"stale", "partial", "unavailable"}:
             st.warning("官方總經資料不完整或過期；以下內容僅供研究脈絡參考。")
         for signal in signals[:3]:
             current = "無資料" if signal.current_value is None else f"{signal.current_value:g}"
             delta = "無資料" if signal.delta is None else f"{signal.delta:+g}"
+            status_zh = signal_status_labels.get(signal.status, signal.status)
             st.write(
-                f"{signal.title}｜{signal.status}｜目前 {current}｜變化 {delta}｜"
-                f"下一條件：{signal.next_condition}"
+                f"{signal.title}｜{status_zh}｜目前 {current}｜變化 {delta}｜"
+                f"下一觀察條件：{signal.next_condition}"
             )
             st.caption(
                 f"資料期間：{signal.observation_period or '無資料'}｜"
                 f"觀測日：{signal.observed_date or '無資料'}｜"
-                f"取得時間：{signal.fetched_at or '無資料'}｜"
                 f"發布日：{signal.release_date or '未提供'}"
             )
             if signal.limitations:
                 st.caption("限制：" + "、".join(signal.limitations))
-        if revisions:
-            st.caption("重要修訂")
-            for revision in revisions[:5]:
-                st.write(
-                    f"{revision.get('series_id')}／{revision.get('observation_period')}："
-                    f"{revision.get('first_seen_value')} → {revision.get('latest_value')}"
-                )
-        if links:
-            st.caption("持股／自選股總經關聯")
-            for link in links:
-                identity = link.get("identity", "未知身分")
-                classification = link.get("sector") or link.get("industry") or "尚無可驗證對應"
-                st.write(
-                    f"{identity}｜分類：{classification}｜規則：{link.get('rule_version', '未知')}"
-                )
-                st.caption(str(link.get("macro_relation_message", "尚無可驗證總經關聯")))
+        if revisions or links:
+            with _safe_expander(st, "總經修訂歷史與持股關聯", expanded=False):
+                if revisions:
+                    st.markdown("**重要數據修訂**")
+                    for revision in revisions[:5]:
+                        st.write(
+                            f"{revision.get('series_id')}（{revision.get('observation_period')}）："
+                            f"{revision.get('first_seen_value')} → {revision.get('latest_value')}"
+                        )
+                if links:
+                    st.markdown("**持股／自選股總經關聯**")
+                    for link in links:
+                        identity = link.get("identity", "未知身分")
+                        classification = (
+                            link.get("sector") or link.get("industry") or "尚無可驗證對應"
+                        )
+                        st.write(f"{identity}｜分類：{classification}")
+                        st.caption(str(link.get("macro_relation_message", "尚無可驗證總經關聯")))
         if snapshot.warnings:
-            for warning in snapshot.warnings[:3]:
+            for warning in deduplicate_warnings(snapshot.warnings[:3]):
                 st.warning(warning)
     if st.button("更新總經資料", key="home_refresh_macro"):
         return HomeAction(kind="macro_refresh")
@@ -662,7 +745,7 @@ def _render_macro_background(
 
 
 def _render_daily_changes(st: Any, summary: DailyResearchChangeSet | None) -> None:
-    """Render the deterministic change projection without refreshing data."""
+    """Render the deterministic change projection with clean company titles."""
 
     st.subheader("今天的重點變化")
     if summary is None:
@@ -675,11 +758,16 @@ def _render_daily_changes(st: Any, summary: DailyResearchChangeSet | None) -> No
         "insufficient": "資料不足",
         "unavailable": "目前無法取得",
     }
-    st.caption(
-        f"{status_labels.get(summary.status, '狀態未知')}；目前簡報 {summary.current_brief_fingerprint[:12]}"
-    )
+    st.caption(f"狀態：{status_labels.get(summary.status, '狀態未知')}")
     for index, change in enumerate(summary.changes):
-        with st.expander(f"{change.title}｜{change.identity}｜優先級 {change.priority}"):
+        identity_display = change.identity
+        if ":" in change.identity:
+            m, c = change.identity.split(":", 1)
+            identity_display = format_taiwan_company_display(c, market=m)
+        elif change.identity == "portfolio":
+            identity_display = "持股整體事件"
+
+        with _safe_expander(st, f"{change.title}｜{identity_display}｜優先級 {change.priority}"):
             st.write(change.description)
             st.write(f"原因：{change.reason}")
             if change.current_value:
@@ -687,12 +775,12 @@ def _render_daily_changes(st: Any, summary: DailyResearchChangeSet | None) -> No
             if change.previous_value:
                 st.write(f"先前：{'；'.join(change.previous_value[:3])}")
             st.caption(
-                f"資料截至：{change.current_data_as_of or '無資料'}；"
+                f"資料截至：{format_iso_datetime(change.current_data_as_of)}；"
                 f"引用：{', '.join(change.reference_ids) if change.reference_ids else '無'}"
             )
             if change.ai_allowed:
                 st.caption("可由既有 AI 協助改寫，但不得新增未引用事實。")
-    for warning in summary.warnings:
+    for warning in deduplicate_warnings(summary.warnings):
         st.warning(warning)
 
 
@@ -708,7 +796,9 @@ def _render_daily_research_inbox(
         st.info("尚無每日研究執行紀錄；排程或手動執行後會顯示在這裡。")
         return
     for index, entry in enumerate(entries):
-        label = f"{entry.completed_at} · {entry.status}"
+        completed_fmt = format_iso_datetime(entry.completed_at)
+        status_zh = format_status_label(entry.status)
+        label = f"{completed_fmt} · {status_zh}"
         expander = getattr(st, "expander", None)
         context = expander(label) if callable(expander) else None
         if context is None:
@@ -717,7 +807,7 @@ def _render_daily_research_inbox(
         else:
             target = context
         with context if context is not None else _null_context():
-            target.write(f"資料來源：{entry.source_mode}")
+            target.write(f"資料來源：{format_source_state_label(entry.source_mode)}")
             target.write(f"原因：{entry.reason}")
             target.write(f"下一步：{entry.next_step}")
             if (

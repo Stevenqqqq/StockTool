@@ -102,6 +102,16 @@ def _dependencies(callback):
     )
 
 
+def test_scroll_reset_uses_supported_inline_component_without_iframe_handshake() -> None:
+    shell_source = Path("src/stock_tool/dashboard/shell.py").read_text(encoding="utf-8")
+
+    assert "streamlit.components.v2" in shell_source
+    assert 'component(\n        "scroll_reset"' in shell_source
+    assert "requestAnimationFrame(reset)" in shell_source
+    assert "declare_component" not in shell_source
+    assert "streamlit:componentReady" not in shell_source
+
+
 def test_shell_search_can_retry_the_same_request_after_a_failure() -> None:
     fake_st = _FakeStreamlit()
     calls: list[tuple[str, str]] = []

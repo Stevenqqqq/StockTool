@@ -160,7 +160,7 @@ def render_research_chart(st: Any, model: ResearchChartModel, *, compact: bool =
         visible_columns.append("volume")
     st.dataframe(
         model.data.loc[:, visible_columns].copy(deep=True),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
     st.caption(f"資料最後日期：{model.last_data_date or '資料不足'}；期間：{model.period}。")

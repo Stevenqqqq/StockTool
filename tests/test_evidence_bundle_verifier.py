@@ -619,11 +619,44 @@ def test_verifier_accepts_zoom_and_keyboard_scenarios(tmp_path: Path) -> None:
             "initial_value": "請選擇市場",
             "changed_value": "台股上市 TWSE",
             "steps": [
-                {"step": 1, "action": "Tab", "focus": "sidebar"},
-                {"step": 2, "action": "Tab", "focus": "market_select"},
-                {"step": 3, "action": "Enter", "focus": "menu_open"},
-                {"step": 4, "action": "ArrowDown", "focus": "option_twse"},
-                {"step": 5, "action": "Enter", "focus": "option_selected"},
+                {
+                    "step": 1,
+                    "key": "Tab",
+                    "action": "focus_sidebar",
+                    "is_valid_stocktool_step": True,
+                },
+                {
+                    "step": 2,
+                    "key": "ArrowDown",
+                    "action": "switch_workspace",
+                    "is_valid_stocktool_step": True,
+                },
+                {
+                    "step": 3,
+                    "key": "Shift+Tab",
+                    "action": "backward_navigation",
+                    "active_element": {
+                        "tag": "input",
+                        "text": "研究首頁",
+                        "rect": {"width": 18, "height": 18},
+                    },
+                    "owner_label": {"is_visible": True},
+                    "is_valid_stocktool_step": True,
+                },
+                {
+                    "step": 4,
+                    "key": "Enter",
+                    "action": "trigger_button",
+                    "is_valid_stocktool_step": True,
+                },
+                {
+                    "step": 5,
+                    "key": "Space",
+                    "action": "toggle_checkbox",
+                    "before_state": {"checked": False},
+                    "after_state": {"checked": True},
+                    "is_valid_stocktool_step": True,
+                },
             ],
         },
     )
@@ -761,6 +794,11 @@ def test_verifier_rejects_tampered_zoom_scenario(tmp_path: Path, mutation: str) 
         "no_dom_change",
         "missing_arrow_action",
         "missing_initial_value_in_dom",
+        "missing_space_action",
+        "invalid_required_step",
+        "invalid_shift_target",
+        "invalid_shift_permalink",
+        "unchanged_space_state",
     ],
 )
 def test_verifier_rejects_tampered_keyboard_scenario(tmp_path: Path, mutation: str) -> None:
@@ -799,15 +837,51 @@ def test_verifier_rejects_tampered_keyboard_scenario(tmp_path: Path, mutation: s
         kb_captures[f"keyboard_{stage}_console"] = _descriptor(root, console_p, captured=captured)
 
     steps = [
-        {"step": 1, "action": "Tab", "focus": "sidebar"},
-        {"step": 2, "action": "Tab", "focus": "market_select"},
-        {"step": 3, "action": "Enter", "focus": "menu_open"},
+        {
+            "step": 1,
+            "key": "Tab",
+            "action": "focus_sidebar",
+            "is_valid_stocktool_step": mutation != "invalid_required_step",
+        },
+        {
+            "step": 2,
+            "key": "ArrowDown" if mutation != "missing_arrow_action" else "Tab",
+            "action": "switch_workspace",
+            "is_valid_stocktool_step": True,
+        },
+        {
+            "step": 3,
+            "key": "Shift+Tab",
+            "action": "backward_navigation",
+            "active_element": {
+                "tag": (
+                    "body"
+                    if mutation == "invalid_shift_target"
+                    else ("a" if mutation == "invalid_shift_permalink" else "input")
+                ),
+                "text": "Link to heading" if mutation == "invalid_shift_permalink" else "",
+                "rect": {
+                    "width": 0 if mutation == "invalid_shift_target" else 18,
+                    "height": 0 if mutation == "invalid_shift_target" else 18,
+                },
+            },
+            "owner_label": (None if mutation == "invalid_shift_target" else {"is_visible": True}),
+            "is_valid_stocktool_step": True,
+        },
         {
             "step": 4,
-            "action": "ArrowDown" if mutation != "missing_arrow_action" else "Tab",
-            "focus": "option_twse",
+            "key": "Enter",
+            "action": "trigger_button",
+            "is_valid_stocktool_step": True,
         },
-        {"step": 5, "action": "Enter", "focus": "option_selected"},
+        {
+            "step": 5,
+            "key": "Tab" if mutation == "missing_space_action" else "Space",
+            "action": "toggle_checkbox",
+            "before_state": {"checked": False},
+            "after_state": {"checked": False if mutation == "unchanged_space_state" else True},
+            "is_valid_stocktool_step": True,
+        },
     ]
 
     kb_trace_p = root / "keyboard-navigation-trace.json"

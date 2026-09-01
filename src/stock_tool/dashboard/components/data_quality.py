@@ -86,11 +86,11 @@ def render_data_quality(st: Any, evidence: Mapping[str, Any]) -> bool:
         for warning in evidence["warnings"]:
             st.warning(warning)
     if evidence["attempts"]:
-        st.caption("Provider 嘗試與備援紀錄")
-        st.dataframe(evidence["attempts"], use_container_width=True, hide_index=True)
+        st.caption("外部資料來源嘗試與備援紀錄")
+        st.dataframe(evidence["attempts"], width="stretch", hide_index=True)
     if evidence["health"]:
-        st.caption("Provider Health（僅本次執行期間；重新啟動後會重設）")
-        st.dataframe(evidence["health"], use_container_width=True, hide_index=True)
+        st.caption("資料來源健康狀態（僅本次執行期間；重新啟動後會重設）")
+        st.dataframe(evidence["health"], width="stretch", hide_index=True)
     st.info(f"下一步：{evidence['next_step']}")
     return bool(
         st.button(

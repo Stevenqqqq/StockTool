@@ -18,6 +18,33 @@ from stock_tool.portfolio_stress import StressScenario, StressScenarioType
 from stock_tool.portfolio_valuation import Currency, FxQuote
 
 
+from stock_tool.dashboard.presentation_mapper import (
+    format_iso_datetime,
+    format_source_state_label,
+    format_status_label,
+    translate_health_category,
+    translate_health_reason,
+)
+
+
+def _safe_expander(st: Any, label: str, expanded: bool = False) -> Any:
+    expander = getattr(st, "expander", None)
+    if callable(expander):
+        try:
+            return expander(label, expanded=expanded)
+        except TypeError:
+            return expander(label)
+    return _null_context()
+
+
+class _null_context:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+
 def render_portfolio_workspace(
     st: Any,
     *,
@@ -28,22 +55,25 @@ def render_portfolio_workspace(
 ) -> None:
     """Render holdings management and read-only analysis without implicit I/O."""
 
-    st.title("持倉工作區")
     st.caption("管理市場限定的持股、估值與風險證據。這不是交易建議，不會自動下單。")
     snapshot = st.session_state.get("portfolio_workspace_snapshot")
     if snapshot is None:
         snapshot = service.load_snapshot()
         st.session_state.portfolio_workspace_snapshot = snapshot
-    positions = snapshot.positions.copy(deep=True)
+    st.session_state.setdefault(
+        "portfolio_workspace_stress_type", StressScenarioType.ALL_HOLDINGS_DECLINE.value
+    )
+    st.session_state.setdefault("portfolio_workspace_stress_shock", 0.1)
+    st.session_state.setdefault("portfolio_workspace_stress_market", "TWSE")
 
-    _render_first_screen(st, snapshot, st.session_state.get("portfolio_workspace_analysis"))
-    _render_position_editor(st, service, positions)
-    positions = st.session_state.get("portfolio_workspace_positions", positions)
+    positions = st.session_state.get("portfolio_workspace_positions")
     if not isinstance(positions, pd.DataFrame):
-        positions = service.load_positions()
-    focus_identity = _consume_portfolio_focus(st, positions)
-    _render_position_table(st, positions, on_research=on_research, focus_identity=focus_identity)
+        positions = snapshot.positions.copy(deep=True)
 
+    # 1. 持倉概況
+    _render_first_screen(st, snapshot, st.session_state.get("portfolio_workspace_analysis"))
+
+    # 2. 分析持倉
     if refresh_callback is not None and st.button(
         "更新市場資料", key="portfolio_workspace_refresh"
     ):
@@ -61,6 +91,14 @@ def render_portfolio_workspace(
     if isinstance(analysis, PortfolioWorkspaceAnalysis):
         _render_analysis(st, service, analysis, positions)
 
+    # 3. 持股管理
+    _render_position_editor(st, service, positions)
+    positions = st.session_state.get("portfolio_workspace_positions", positions)
+    if not isinstance(positions, pd.DataFrame):
+        positions = service.load_positions()
+    focus_identity = _consume_portfolio_focus(st, positions)
+    _render_position_table(st, positions, on_research=on_research, focus_identity=focus_identity)
+
 
 def _render_first_screen(st: Any, snapshot: Any, analysis: object) -> None:
     result = analysis if isinstance(analysis, PortfolioWorkspaceAnalysis) else None
@@ -72,18 +110,20 @@ def _render_first_screen(st: Any, snapshot: Any, analysis: object) -> None:
     coverage = health.coverage.coverage_pct if health is not None else None
     largest = risk.position_concentration if risk is not None else None
     top_three = risk.top_three_concentration if risk is not None else None
-    st.subheader("目前摘要")
+    st.subheader("持倉概況")
     columns = st.columns(6)
-    columns[0].metric("持股數", str(len(snapshot.positions)))
+    columns[0].metric("持股筆數", str(len(snapshot.positions)))
     columns[1].metric("基準幣別總市值", _money(market_value, result))
     columns[2].metric("未實現損益", _money(pnl, result))
     columns[3].metric("資料涵蓋率", _percent(coverage))
     columns[4].metric("最大單一持股", _percent(largest))
     columns[5].metric("前三大集中度", _percent(top_three))
     if result is None:
-        st.info("尚未分析持股；請先確認持股內容與目前已載入的價格資料。")
+        st.info("尚未分析持股；請點擊下方「分析持倉」以計算最新估值與風險。")
         return
-    st.caption(f"資料狀態：{result.status.value}；manifest digest：{result.manifest.digest}")
+    st.caption(f"資料狀態：{format_status_label(result.status.value)}")
+    with _safe_expander(st, "詳細技術診斷與可重現資料", expanded=False):
+        st.caption(f"診斷 manifest digest：{result.manifest.digest}")
     if result.status is PortfolioDataStatus.PARTIAL:
         st.warning("資料尚未完整，部分總額與權重不會被計算。")
     elif result.status is PortfolioDataStatus.STALE:
@@ -120,47 +160,67 @@ def _render_position_editor(
         note = columns[5].text_input(
             "備註（不納入分析 manifest）", value="", key="portfolio_workspace_note"
         )
+        raw_symbol = (
+            str(symbol).strip()
+            or str(st.session_state.get("portfolio_workspace_symbol") or "").strip()
+        )
         if st.button("加入／更新持股", type="primary", key="portfolio_workspace_upsert"):
-            try:
-                updated = service.add_or_update_position(
-                    positions,
-                    symbol=symbol,
-                    market=market,
-                    currency=None if currency == "自動" else currency,
-                    quantity=float(quantity),
-                    average_cost=float(average_cost),
-                    note=note,
-                )
-            except (OSError, ValueError) as exc:
-                st.error(f"持股儲存失敗：{exc}")
+            if not raw_symbol:
+                st.warning("請輸入股票代號。")
             else:
-                st.session_state.portfolio_workspace_positions = updated
-                st.session_state.portfolio_workspace_snapshot = service.load_snapshot()
-                _invalidate_analysis(st)
-                st.success(f"已儲存 {str(symbol).strip().upper()} / {market}。")
-                _rerun(st)
+                try:
+                    updated = service.add_or_update_position(
+                        positions,
+                        symbol=raw_symbol,
+                        market=market,
+                        currency=None if currency == "自動" else currency,
+                        quantity=float(quantity),
+                        average_cost=float(average_cost),
+                        note=note,
+                    )
+                except (OSError, ValueError) as exc:
+                    st.error(f"持股儲存失敗：{exc}")
+                else:
+                    st.session_state.portfolio_workspace_positions = updated
+                    st.session_state.portfolio_workspace_snapshot = service.load_snapshot()
+                    _invalidate_analysis(st)
+                    st.success(f"已儲存 {raw_symbol.upper()} / {market}。")
+                    _rerun(st)
+
     if not positions.empty:
+        st.markdown("#### 移除指定持股")
         identities = [
             f"{row.symbol} / {row.market}"
             for row in positions[["symbol", "market"]].itertuples(index=False)
         ]
         selected = st.selectbox(
-            "移除指定市場持股", identities, key="portfolio_workspace_remove_identity"
+            "移除指定市場持股",
+            identities,
+            key="portfolio_workspace_remove_identity",
+        )
+        confirmed = st.checkbox(
+            f"我確認要從持倉中移除 {selected}（此操作無法復原）",
+            value=False,
+            key="portfolio_workspace_remove_confirmed",
         )
         if st.button("移除持股", key="portfolio_workspace_remove"):
-            symbol_value, market_value = selected.split(" / ", maxsplit=1)
-            try:
-                updated = service.remove_position(
-                    positions, symbol=symbol_value, market=market_value
-                )
-            except (OSError, ValueError) as exc:
-                st.error(f"持股移除失敗：{exc}")
+            if not confirmed:
+                st.warning("請先勾選確認方塊，以確認移除此持股。")
             else:
-                st.session_state.portfolio_workspace_positions = updated
-                st.session_state.portfolio_workspace_snapshot = service.load_snapshot()
-                _invalidate_analysis(st)
-                st.success(f"已移除 {symbol_value} / {market_value}。")
-                _rerun(st)
+                symbol_value, market_value = selected.split(" / ", maxsplit=1)
+                try:
+                    updated = service.remove_position(
+                        positions, symbol=symbol_value, market=market_value
+                    )
+                except (OSError, ValueError) as exc:
+                    st.error(f"持股移除失敗：{exc}")
+                else:
+                    st.session_state.portfolio_workspace_positions = updated
+                    st.session_state.portfolio_workspace_snapshot = service.load_snapshot()
+                    _invalidate_analysis(st)
+                    st.success(f"已移除 {symbol_value} / {market_value}。")
+                    _rerun(st)
+
     if st.button("重新載入持股", key="portfolio_workspace_reload"):
         st.session_state.portfolio_workspace_positions = service.load_positions()
         st.session_state.portfolio_workspace_snapshot = service.load_snapshot()
@@ -177,11 +237,15 @@ def _render_position_table(
     focus_identity: str | None = None,
 ) -> None:
     if positions.empty:
-        st.info("目前沒有持股。")
+        st.info("目前沒有持股。請使用上方表格新增持股。")
         return
+    st.subheader("現有持股清單")
+    display_df = positions[["symbol", "market", "currency", "quantity", "average_cost"]].copy()
+    display_df.columns = ["股票代號", "市場", "幣別", "持股數量", "平均成本"]
     st.dataframe(
-        positions[["symbol", "market", "currency", "quantity", "average_cost"]],
+        display_df,
         width="stretch",
+        hide_index=True,
     )
     if on_research is not None:
         identities = [
@@ -293,13 +357,11 @@ def _render_analysis(
 ) -> None:
     prices = _frame_or_none(st.session_state.get("price_data"))
     quote = _resolved_fx_quote(st)
-    resolution = st.session_state.get("portfolio_fx_resolution")
     if quote is not None:
         st.caption(
-            f"FX source: {getattr(resolution, 'status', quote.source)}; "
-            f"effective_at={quote.effective_at}; "
-            f"applied_at={st.session_state.get('portfolio_workspace_manual_fx_applied_at') or 'n/a'}; "
-            f"stale={bool(quote.stale)}"
+            f"匯率來源：{format_source_state_label(quote.source)}｜"
+            f"生效時間：{format_iso_datetime(quote.effective_at)}｜"
+            f"狀態：{'過期' if quote.stale else '正常'}"
         )
     base_currency = st.session_state.get(
         "portfolio_workspace_base_currency",
@@ -317,36 +379,70 @@ def _render_analysis(
         st.warning("設定或資料已變更，保存的分析結果可能過期；請重新分析。")
     st.subheader("估值、健康度與風險")
     if not analysis.valuation.positions.empty:
-        st.dataframe(analysis.valuation.positions, width="stretch")
-    st.write(f"健康度狀態：{analysis.health.status}")
+        val_df = analysis.valuation.positions.copy(deep=True)
+        rename_map = {
+            "symbol": "股票代號",
+            "market": "市場",
+            "currency": "幣別",
+            "quantity": "持股數量",
+            "average_cost": "平均成本",
+            "close": "最新收盤",
+            "market_value": "目前市值",
+            "unrealized_pnl": "未實現損益",
+            "unrealized_pnl_pct": "未實現報酬率",
+            "weight": "持股權重",
+            "status": "資料狀態",
+        }
+        val_df = val_df.rename(columns={k: v for k, v in rename_map.items() if k in val_df.columns})
+        if "資料狀態" in val_df.columns:
+            val_df["資料狀態"] = val_df["資料狀態"].map(lambda s: format_status_label(s))
+        st.dataframe(val_df, width="stretch", hide_index=True)
+    st.write(f"健康度評估狀態：{format_status_label(analysis.health.status)}")
     for component in analysis.health.components:
-        st.write(
-            f"{component.name}：{_health_percent(component.score)}；{' '.join(component.reasons)}"
-        )
+        comp_name = translate_health_category(component.name)
+        reasons = " ".join([translate_health_reason(r) for r in component.reasons])
+        st.write(f"{comp_name}：{_health_percent(component.score)}；{reasons}")
+    exp_labels = {
+        "market": "市場曝險",
+        "currency": "幣別曝險",
+        "sector": "板塊曝險",
+        "industry": "產業曝險",
+    }
     for exposure in (
         analysis.risk.market_exposure,
         analysis.risk.currency_exposure,
         analysis.risk.sector_exposure,
         analysis.risk.industry_exposure,
     ):
+        dim_label = exp_labels.get(str(exposure.dimension).lower(), str(exposure.dimension))
         values = ", ".join(f"{item.identity} {_percent(item.weight)}" for item in exposure.items)
-        st.write(f"{exposure.dimension}：{values or '資料不足'}")
+        st.write(f"{dim_label}：{values or '資料不足'}")
     if analysis.ledger_snapshot is None:
-        st.info("Ledger 尚不存在；已實現損益 unavailable，未自動建立 Ledger。")
+        st.info("帳本（Ledger）尚未建立；已實現損益需等交易紀錄建立後計算。")
     else:
-        st.write(f"Ledger 已實現損益：{_money(analysis.risk.realized_pnl, analysis)}")
+        st.write(f"帳本已實現損益：{_money(analysis.risk.realized_pnl, analysis)}")
     gaps = [item.to_dict() for item in analysis.risk.missing_data]
     if gaps:
         st.subheader("資料缺口與修復方式")
-        st.dataframe(pd.DataFrame(gaps), width="stretch")
+        gap_df = pd.DataFrame(gaps)
+        gap_rename = {
+            "field": "缺少欄位",
+            "state": "狀態",
+            "reason": "原因與修復建議",
+        }
+        gap_df = gap_df.rename(columns={k: v for k, v in gap_rename.items() if k in gap_df.columns})
+        if "狀態" in gap_df.columns:
+            gap_df["狀態"] = gap_df["狀態"].map(lambda s: format_status_label(s))
+        st.dataframe(gap_df, width="stretch", hide_index=True)
     _render_stress(st, service, analysis)
-    st.download_button(
-        "下載分析 manifest",
-        data=analysis.manifest.to_json(),
-        file_name="portfolio-workspace-manifest.json",
-        mime="application/json",
-        key="portfolio_workspace_manifest_download",
-    )
+    with _safe_expander(st, "詳細資料與可重現 Manifest", expanded=False):
+        st.download_button(
+            "下載分析 manifest",
+            data=analysis.manifest.to_json(),
+            file_name="portfolio-workspace-manifest.json",
+            mime="application/json",
+            key="portfolio_workspace_manifest_download",
+        )
 
 
 def _render_stress(

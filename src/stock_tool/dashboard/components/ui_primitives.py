@@ -171,3 +171,31 @@ def outcome_matrix_markup(outcome_counts: Mapping[str, Mapping[str, int]]) -> st
         f'<div class="st-ui-outcome-grid">{"".join(horizons)}</div>'
         "</section>"
     )
+
+
+def danger_panel_markup(*, title: str, message: str, warning_note: str | None = None) -> str:
+    """Build a designated dangerous action warning container."""
+    warning_html = (
+        f'<p class="st-ui-danger-panel__note">{_safe(warning_note)}</p>' if warning_note else ""
+    )
+    return (
+        '<section class="st-ui-danger-panel">'
+        '<div class="st-ui-danger-panel__marker" aria-hidden="true"></div>'
+        '<div class="st-ui-danger-panel__copy">'
+        f"<strong>{_safe(title)}</strong>"
+        f"<p>{_safe(message)}</p>"
+        f"{warning_html}"
+        "</div>"
+        "</section>"
+    )
+
+
+def action_banner_markup(*, title: str, description: str, tone: str = "info") -> str:
+    """Build a prominent single-action hero banner."""
+    tone_class = _tone_class(tone)
+    return (
+        f'<section class="st-ui-action-banner {tone_class}">'
+        f"<h3>{_safe(title)}</h3>"
+        f"<p>{_safe(description)}</p>"
+        "</section>"
+    )

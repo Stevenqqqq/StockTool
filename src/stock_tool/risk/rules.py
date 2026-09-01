@@ -193,7 +193,9 @@ class RiskManager:
             )
 
         if equity > 0:
-            threshold = self.config.default_stop_loss_pct if stop_loss_pct is None else stop_loss_pct
+            threshold = (
+                self.config.default_stop_loss_pct if stop_loss_pct is None else stop_loss_pct
+            )
             if not 0 < threshold < 1:
                 raise ValueError("stop_loss_pct 必須介於 0 到 1 之間。")
             estimated_loss = order_value * threshold
@@ -210,7 +212,9 @@ class RiskManager:
                     )
                 )
 
-        projected_position_pct = (current_position_value + order_value) / equity if equity > 0 else 1.0
+        projected_position_pct = (
+            (current_position_value + order_value) / equity if equity > 0 else 1.0
+        )
         if projected_position_pct > self.config.max_position_pct:
             alerts.append(
                 RiskAlert(
@@ -223,7 +227,10 @@ class RiskManager:
                 )
             )
 
-        if symbol not in portfolio.positions and len(portfolio.positions) >= self.config.max_positions:
+        if (
+            symbol not in portfolio.positions
+            and len(portfolio.positions) >= self.config.max_positions
+        ):
             alerts.append(
                 RiskAlert(
                     code="max_positions_exceeded",
@@ -266,7 +273,7 @@ class RiskManager:
             max_position_pct=self.config.max_position_pct,
             min_cash_ratio=self.config.min_cash_ratio,
         )
-        if adjusted_quantity >= quantity:
+        if adjusted_quantity is not None and adjusted_quantity >= quantity:
             adjusted_quantity = None
 
         warnings_found = tuple(alert for alert in alerts if alert.severity != "critical")
@@ -344,7 +351,9 @@ class RiskManager:
         position = portfolio.positions.get(symbol)
         if position is None:
             return None
-        threshold = stop_loss_pct if stop_loss_pct is not None else self.config.default_stop_loss_pct
+        threshold = (
+            stop_loss_pct if stop_loss_pct is not None else self.config.default_stop_loss_pct
+        )
         if not 0 < threshold < 1:
             raise ValueError("stop_loss_pct 必須介於 0 到 1 之間。")
         stop_price = position.average_cost * (1.0 - threshold)
@@ -374,7 +383,7 @@ class RiskManager:
         if equity_curve is not None and not equity_curve.empty:
             alerts.extend(self._drawdown_alerts(equity_curve))
         if returns is not None and not returns.empty:
-            volatility = float(returns.std(ddof=0) * (252 ** 0.5))
+            volatility = float(returns.std(ddof=0) * (252**0.5))
             if volatility > self.config.max_volatility:
                 alerts.append(
                     RiskAlert(
@@ -449,7 +458,9 @@ class RiskManager:
         if resolved_industry is None:
             return None
         industry_values = _industry_values(portfolio, industry_map or {})
-        industry_values[resolved_industry] = industry_values.get(resolved_industry, 0.0) + added_value
+        industry_values[resolved_industry] = (
+            industry_values.get(resolved_industry, 0.0) + added_value
+        )
         equity = portfolio.total_equity
         pct = industry_values[resolved_industry] / equity if equity > 0 else 1.0
         if pct > self.config.max_industry_pct:

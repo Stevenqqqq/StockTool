@@ -191,7 +191,7 @@ def _render_document_citation_controls(
         if not selected:
             continue
         citation_ids = st.multiselect(
-            "引用 evidence IDs",
+            "引用證據項目（Evidence IDs）",
             options=evidence_ids,
             key=f"research_document_citations_{document.document_id}",
         )
@@ -223,11 +223,20 @@ def _render_company_overview(st: Any, snapshot: ResearchSnapshot, *, compact: bo
     if profile is None:
         st.info("公司資料不足。請確認代號與市場，或補充可驗證的公開公司資料。")
         return
-    st.caption("公司名稱、產業與 sector 標示為事實資料；業務與產業鏈內容標示為研究推論。")
+    st.caption("公司名稱與產業分類標示為事實資料；業務與產業鏈內容標示為研究推論。")
     st.markdown("**事實資料**")
     st.write(f"公司名稱：{profile.company_name}")
-    st.write(f"產業／sector：{profile.industry}／{profile.sector}")
-    st.write(f"資料來源：{'；'.join(profile.data_sources)}")
+    industry_str = (
+        f"{profile.industry}／{profile.sector}"
+        if profile.sector and profile.sector != profile.industry
+        else profile.industry
+    )
+    st.write(f"產業類別：{industry_str or '資料不足'}")
+    sources = [
+        str(s).replace("online", "線上來源").replace("canonical", "標準格式")
+        for s in profile.data_sources
+    ]
+    st.write(f"資料來源：{'；'.join(sources)}")
     st.markdown("**研究推論：主要業務與技術**")
     for item in (*profile.main_business, *profile.technical_features):
         st.write(f"- {item}")
@@ -237,7 +246,13 @@ def _render_company_overview(st: Any, snapshot: ResearchSnapshot, *, compact: bo
     else:
         _render_company_inferences(st, profile)
     for limitation in profile.limitations:
-        st.caption(f"限制：{limitation}")
+        lim_text = (
+            str(limitation)
+            .replace("Point-in-time", "歷史切點（PIT）")
+            .replace("point-in-time", "歷史切點（PIT）")
+            .replace("online", "線上來源")
+        )
+        st.caption(f"限制：{lim_text}")
 
 
 def _render_company_inferences(st: Any, profile: Any) -> None:
@@ -281,6 +296,16 @@ def _render_fundamentals(st: Any, snapshot: ResearchSnapshot) -> None:
     if snapshot.fundamental_results is None or snapshot.fundamental_results.empty:
         st.info("資料不足，尚無可用基本面結果。")
         return
-    st.dataframe(
-        snapshot.fundamental_results.copy(deep=True), use_container_width=True, hide_index=True
-    )
+    frame = snapshot.fundamental_results.copy(deep=True)
+    cols = st.columns(3)
+    cols[0].metric("指標項目筆數", str(len(frame)))
+    if "date" in frame.columns or "日期" in frame.columns:
+        date_col = "date" if "date" in frame.columns else "日期"
+        latest_date = str(frame[date_col].iloc[-1])
+        cols[1].metric("最新資料日期", str(latest_date)[:10])
+    else:
+        cols[1].metric("資料格式", "已驗證指標")
+    cols[2].metric("覆蓋狀態", "可查核公開數據")
+
+    st.markdown("#### 詳細財務指標數據")
+    st.dataframe(frame, width="stretch", hide_index=True)

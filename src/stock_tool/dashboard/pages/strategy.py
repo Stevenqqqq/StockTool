@@ -185,7 +185,7 @@ def _render_oos(st: Any, result: Any) -> None:
             },
         ]
     )
-    st.dataframe(comparison, use_container_width=True)
+    st.dataframe(comparison, width="stretch")
     _render_warnings(st, result.warnings)
 
 
@@ -205,7 +205,7 @@ def _render_walk_forward(st: Any, result: Any) -> None:
         }
         for fold in result.folds
     ]
-    st.dataframe(pd.DataFrame(rows), use_container_width=True)
+    st.dataframe(pd.DataFrame(rows), width="stretch")
     _render_warnings(st, result.warnings)
 
 
@@ -223,7 +223,7 @@ def _render_sensitivity(st: Any, result: Any) -> None:
         }
         for run in result.runs
     ]
-    st.dataframe(pd.DataFrame(rows), use_container_width=True)
+    st.dataframe(pd.DataFrame(rows), width="stretch")
     _render_warnings(st, result.warnings)
     st.caption("所有組合使用相同資料期間、成本與執行模型；不以最高報酬視為推薦參數。")
 

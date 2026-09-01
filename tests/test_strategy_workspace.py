@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pandas as pd
 from streamlit.testing.v1 import AppTest
@@ -218,7 +219,7 @@ def test_strategy_workspace_binds_all_costs_and_allocation_to_engine_and_manifes
     assert captured["initial_cash"] == values.initial_cash
     assert captured["max_position_pct"] == values.max_position_pct
     assert captured["trailing_stop_pct"] == values.trailing_stop_pct
-    broker = captured["broker_config"]
+    broker: Any = captured["broker_config"]
     assert broker.commission_rate == values.commission_rate
     assert broker.tax_rate == values.tax_rate
     assert broker.slippage_rate == values.slippage_rate
@@ -346,3 +347,58 @@ def test_strategy_workspace_health_is_bounded_and_preserves_standard_result() ->
         values=values,
     )
     assert run.status in {"complete", "partial", "blocked"}
+
+
+def test_strategy_workspace_metrics_formatting_is_ratio_based() -> None:
+    from stock_tool.dashboard.presentation_mapper import format_percentage
+
+    # Total return ratio of 0.5667 must format as +56.67%, not +0.57%
+    formatted_return = format_percentage(0.5667, with_sign=True, is_ratio=True)
+    assert formatted_return == "+56.67%"
+    assert formatted_return != "+0.57%"
+
+    # Max drawdown ratio of 0.1234 must format as 12.34%, not 0.12%
+    formatted_drawdown = format_percentage(0.1234, is_ratio=True)
+    assert formatted_drawdown == "12.34%"
+    assert formatted_drawdown != "0.12%"
+
+
+def test_strategy_workspace_render_run_branches() -> None:
+    from types import SimpleNamespace
+    from stock_tool.dashboard.pages.strategy_workspace import _render_run
+
+    service = StrategyWorkspaceApplicationService()
+
+    class FakeSt:
+        def __init__(self):
+            self.warnings = []
+            self.errors = []
+            self.subheaders = []
+            self.infos = []
+
+        def warning(self, msg):
+            self.warnings.append(msg)
+
+        def error(self, msg):
+            self.errors.append(msg)
+
+        def subheader(self, msg):
+            self.subheaders.append(msg)
+
+        def info(self, msg):
+            self.infos.append(msg)
+
+        def columns(self, n):
+            return [SimpleNamespace(metric=lambda *a, **k: None) for _ in range(n)]
+
+    # Test blocked run
+    st = FakeSt()
+    blocked_run = SimpleNamespace(status="blocked")
+    _render_run(st, blocked_run, None, service)
+    assert any("標準回測未執行" in w for w in st.warnings)
+
+    # Test error run
+    st = FakeSt()
+    error_run = SimpleNamespace(status="error", health_message="計算錯誤")
+    _render_run(st, error_run, None, service)
+    assert any("計算錯誤" in e for e in st.errors)

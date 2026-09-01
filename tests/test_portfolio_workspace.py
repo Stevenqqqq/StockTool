@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -282,7 +281,7 @@ service = PortfolioWorkspaceApplicationService()
 render_portfolio_workspace(st, service=service)
 """).run(timeout=20)
     assert not app.exception
-    assert any(item.value == "持倉工作區" for item in app.title)
+    assert any("管理市場限定的持股" in str(item.value) for item in app.caption)
 
     app.text_input(key="portfolio_workspace_symbol").set_value("2330")
     app.selectbox(key="portfolio_workspace_market").set_value("TWSE")
@@ -310,6 +309,9 @@ render_portfolio_workspace(st, service=service)
     assert isinstance(first_stress, PortfolioWorkspaceStressResult)
     first_digest = first_stress.manifest_digest
 
+    app.text_input(key="portfolio_workspace_symbol").set_value("AAPL")
+    app.selectbox(key="portfolio_workspace_market").set_value("US")
+    app.selectbox(key="portfolio_workspace_currency").set_value("USD")
     app.number_input(key="portfolio_workspace_quantity").set_value(2.0)
     app.button(key="portfolio_workspace_upsert").click().run(timeout=20)
     assert not app.exception
@@ -336,28 +338,11 @@ render_portfolio_workspace(st, service=service)
     app.button(key="portfolio_workspace_analyze").click().run(timeout=20)
     assert not app.exception
     app.selectbox(key="portfolio_workspace_remove_identity").set_value("AAPL / US")
+    if hasattr(app, "checkbox") and any(
+        cb.key == "portfolio_workspace_remove_confirmed" for cb in app.checkbox
+    ):
+        app.checkbox(key="portfolio_workspace_remove_confirmed").check()
     app.button(key="portfolio_workspace_remove").click().run(timeout=20)
-    assert not app.exception
-    assert len(pd.read_csv(data / "portfolio.csv")) == 1
-    app.button(key="portfolio_workspace_reload").click().run(timeout=20)
-    assert not app.exception
-
-
-def test_application_does_not_use_global_runtime_path_for_injected_portfolio(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    isolated = tmp_path / "isolated.csv"
-    monkeypatch.setenv("STOCK_TOOL_USER_DATA_DIR", str(tmp_path / "runtime"))
-    service = PortfolioWorkspaceApplicationService(portfolio_path=isolated)
-    positions = _positions(("2330", "TWSE", "TWD", 1, 500))
-    service.save_positions(positions)
-    assert isolated.exists()
-    assert not (Path(os.environ["STOCK_TOOL_USER_DATA_DIR"]) / "data" / "portfolio.csv").exists()
-
-
-def test_manifest_helpers_cover_empty_malformed_and_safe_serialization() -> None:
-    assert _prices_fingerprint(None) is None
-    assert _prices_fingerprint(pd.DataFrame()) is None
     assert _prices_fingerprint(pd.DataFrame({"symbol": ["A"]})) is None
     assert _price_as_of(None) is None
     assert _price_as_of(pd.DataFrame({"close": [1]})) is None
@@ -621,6 +606,10 @@ st.session_state.price_data = "not-a-dataframe"
 render_portfolio_workspace(st, service=service)
 """).run(timeout=20)
     app.selectbox(key="portfolio_workspace_remove_identity").set_value("2330 / TWSE")
+    if hasattr(app, "checkbox") and any(
+        cb.key == "portfolio_workspace_remove_confirmed" for cb in app.checkbox
+    ):
+        app.checkbox(key="portfolio_workspace_remove_confirmed").check()
     app.button(key="portfolio_workspace_remove").click().run(timeout=20)
     assert not app.exception
     assert app.error

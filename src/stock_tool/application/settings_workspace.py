@@ -181,7 +181,7 @@ class SettingsWorkspaceApplicationService:
         return _inspect_csv_component(
             self.paths.portfolio_file,
             key="portfolio",
-            label="Portfolio 持股",
+            label="持股清單",
             required=("symbol", "market", "quantity", "average_cost"),
             now=self._now,
         )
@@ -190,7 +190,7 @@ class SettingsWorkspaceApplicationService:
         return _inspect_csv_component(
             self.paths.watchlist_file,
             key="watchlist",
-            label="Watchlist 自選股",
+            label="自選股清單",
             required=("symbol", "market"),
             now=self._now,
         )
@@ -198,26 +198,22 @@ class SettingsWorkspaceApplicationService:
     def _inspect_research_library(self) -> SettingsComponentStatus:
         directory = self.paths.research_library_dir
         if not directory.is_dir() or directory.is_symlink():
-            return _missing("research_library", "Research Library", "尚未建立研究庫。")
+            return _missing("research_library", "研究庫", "尚未建立研究庫。")
         entries = sorted(directory.glob("entries/*.json"))
         if not entries:
-            return _missing("research_library", "Research Library", "研究庫目前沒有可讀保存版本。")
+            return _missing("research_library", "研究庫", "研究庫目前沒有可讀保存版本。")
         for entry in entries:
             if not _regular_file(entry):
-                return _error(
-                    "research_library", "Research Library", "研究庫包含無法安全讀取的項目。"
-                )
+                return _error("research_library", "研究庫", "研究庫包含無法安全讀取的項目。")
             try:
                 payload = json.loads(entry.read_text(encoding="utf-8"))
             except (OSError, UnicodeError, json.JSONDecodeError):
-                return _error("research_library", "Research Library", "研究庫包含損壞項目。")
+                return _error("research_library", "研究庫", "研究庫包含損壞項目。")
             if not isinstance(payload, dict):
-                return _error(
-                    "research_library", "Research Library", "研究庫包含格式不正確的項目。"
-                )
+                return _error("research_library", "研究庫", "研究庫包含格式不正確的項目。")
         return _healthy(
             "research_library",
-            "Research Library",
+            "研究庫",
             count=len(entries),
             freshness=_freshness(max(entries, key=lambda item: item.stat().st_mtime), self._now()),
         )
@@ -225,7 +221,7 @@ class SettingsWorkspaceApplicationService:
     def _inspect_ledger(self) -> SettingsComponentStatus:
         path = self.paths.ledger_database_file
         if not _regular_file(path):
-            return _missing("ledger", "Ledger", "尚未建立 Ledger；檢查不會自動建立它。")
+            return _missing("ledger", "持倉帳本", "尚未建立持倉帳本；檢查不會自動建立它。")
         try:
             with closing(_sqlite_read_only(path)) as connection:
                 table_count = int(
@@ -235,10 +231,10 @@ class SettingsWorkspaceApplicationService:
                 )
                 row_count = _sqlite_row_count(connection, "portfolio_ledger_entries")
         except (OSError, sqlite3.Error):
-            return _error("ledger", "Ledger", "Ledger SQLite 無法安全讀取。")
+            return _error("ledger", "持倉帳本", "持倉帳本 SQLite 無法安全讀取。")
         return _healthy(
             "ledger",
-            "Ledger",
+            "持倉帳本",
             count=row_count,
             freshness=_freshness(path, self._now()),
             details=(
@@ -250,7 +246,7 @@ class SettingsWorkspaceApplicationService:
     def _inspect_database(self) -> SettingsComponentStatus:
         path = self.database_path
         if not _regular_file(path):
-            return _missing("sqlite", "SQLite／資料庫", "尚未建立本機市場資料資料庫。")
+            return _missing("sqlite", "本機行情資料庫", "尚未建立本機市場資料資料庫。")
         try:
             with closing(_sqlite_read_only(path)) as connection:
                 table_count = int(
@@ -259,10 +255,10 @@ class SettingsWorkspaceApplicationService:
                     ).fetchone()[0]
                 )
         except (OSError, sqlite3.Error):
-            return _error("sqlite", "SQLite／資料庫", "本機資料庫無法安全讀取。")
+            return _error("sqlite", "本機行情資料庫", "本機資料庫無法安全讀取。")
         return _healthy(
             "sqlite",
-            "SQLite／資料庫",
+            "本機行情資料庫",
             count=table_count,
             freshness=_freshness(path, self._now()),
             details=(("table_count", str(table_count)),),
@@ -271,17 +267,17 @@ class SettingsWorkspaceApplicationService:
     def _inspect_cache(self) -> SettingsComponentStatus:
         directory = self.paths.cache_dir
         if not directory.is_dir() or directory.is_symlink():
-            return _missing("market_cache", "Market-data cache", "尚未建立行情快取。")
+            return _missing("market_cache", "本機行情快取", "尚未建立行情快取。")
         files = [path for path in directory.rglob("*") if path.is_file() and not path.is_symlink()]
         if not files:
-            return _missing("market_cache", "Market-data cache", "行情快取目前沒有檔案。")
+            return _missing("market_cache", "本機行情快取", "行情快取目前沒有檔案。")
         newest = max(files, key=lambda item: item.stat().st_mtime)
         freshness = _freshness(newest, self._now())
         status = "stale" if freshness == "stale" else "healthy"
         warning = ("行情快取已過期，需由使用者明確更新資料。",) if status == "stale" else ()
         return SettingsComponentStatus(
             key="market_cache",
-            label="Market-data cache",
+            label="本機行情快取",
             status=status,
             exists=True,
             count=len(files),
@@ -298,7 +294,7 @@ class SettingsWorkspaceApplicationService:
         status = "healthy"
         return SettingsComponentStatus(
             key="provider_settings",
-            label="Provider／外部 AI 設定",
+            label="外部資料來源與金鑰設定",
             status=status,
             exists=bool(configured),
             count=len(configured),

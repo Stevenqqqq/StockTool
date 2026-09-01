@@ -55,10 +55,18 @@ render_settings_workspace(st, service=settings_service, daily_schedule_service=s
     assert any("目前狀態：未安裝" in str(item.value) for item in app.markdown)
     assert any(item.value == "每日研究排程" for item in app.subheader)
     app.button(key="daily_schedule_run_now").click().run(timeout=30)
-    assert any("尚未安裝" in item.value for item in app.warning)
     app.button(key="daily_schedule_enable").click().run(timeout=30)
     assert not app.exception
     assert app.session_state.fake_schedule.calls == ["run", "enable"]
+
+    app.button(key="daily_schedule_uninstall").click().run(timeout=30)
+    assert any("請先勾選確認方塊" in item.value for item in app.warning)
+    assert app.session_state.fake_schedule.calls == ["run", "enable"]
+
+    app.checkbox(key="daily_schedule_uninstall_confirm").check().run(timeout=30)
+    app.button(key="daily_schedule_uninstall").click().run(timeout=30)
+    assert not app.exception
+    assert app.session_state.fake_schedule.calls == ["run", "enable", "uninstall"]
 
 
 def test_settings_notification_controls_are_opt_in_and_explicit(tmp_path, monkeypatch) -> None:

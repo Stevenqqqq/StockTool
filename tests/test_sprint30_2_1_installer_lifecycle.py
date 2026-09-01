@@ -191,6 +191,8 @@ def test_cleanup_removes_only_owned_and_preserves_unrelated_temp(tmp_path: Path)
             str(ledger),
             "-OutputPath",
             str(output),
+            "-ProcessDetectionMode",
+            "test-none",
         ],
         env=env,
         capture_output=True,

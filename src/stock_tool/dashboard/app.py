@@ -467,7 +467,7 @@ def _display_metric_cards(st: Any, metrics: list[tuple[str, Any]]) -> None:
 def _display_table(st: Any, frame: pd.DataFrame) -> None:
     """Display a DataFrame with consistent dashboard table settings."""
 
-    st.dataframe(localize_display_frame(frame), use_container_width=True)
+    st.dataframe(localize_display_frame(frame), width="stretch")
 
 
 def _display_warnings(st: Any, messages: list[str], limit: int = 10) -> None:

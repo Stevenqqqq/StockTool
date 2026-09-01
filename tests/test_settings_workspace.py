@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import json
@@ -227,7 +228,7 @@ render_settings_workspace(st, service=service, refresh_callback=refresh)
 """).run(timeout=20)
 
     assert not app.exception
-    assert any(item.value == "設定與資料健康" for item in app.title)
+    assert any("查看本機設定與資料狀態" in str(item.value) for item in app.caption)
     assert any("缺少" in str(item.value) for item in app.markdown)
     assert app.session_state["refresh_calls"] == 0
 
@@ -259,3 +260,125 @@ render_settings_workspace(st, service=service, refresh_callback=lambda: (_ for _
     assert not app.exception
     assert app.session_state["settings_workspace_snapshot"].digest == before
     assert any("檢查失敗" in str(item.value) for item in app.error)
+
+
+def test_settings_workspace_render_deduplication_exact_counts(tmp_path: Path, monkeypatch) -> None:
+    """Verify that each missing component gap appears exactly once across the rendered page."""
+    runtime = tmp_path / "runtime"
+    monkeypatch.setenv("STOCK_TOOL_USER_DATA_DIR", str(runtime))
+    app = AppTest.from_string("""
+import os
+import streamlit as st
+from pathlib import Path
+from stock_tool.application.settings_workspace import SettingsWorkspaceApplicationService
+from stock_tool.dashboard.pages.settings_workspace import render_settings_workspace
+from stock_tool.runtime_paths import RuntimePaths
+
+paths = RuntimePaths(Path(os.environ["STOCK_TOOL_USER_DATA_DIR"]))
+service = SettingsWorkspaceApplicationService(paths, database_path=paths.processed_dir / "stock_data.sqlite", environment={})
+render_settings_workspace(st, service=service, refresh_callback=lambda: service.refresh())
+""").run(timeout=20)
+
+    assert not app.exception
+    all_texts = [str(item.value) for item in app.markdown]
+
+    # Check that each standard component status line appears exactly once in rendered markdown
+    components = [
+        "本機設定",
+        "持股清單",
+        "自選股清單",
+        "研究庫",
+        "持倉帳本",
+        "本機行情資料庫",
+        "本機行情快取",
+    ]
+    for comp in components:
+        matching_lines = [
+            text
+            for text in all_texts
+            if comp in text and ("缺少資料" in text or "資料不足" in text or "新鮮度" in text)
+        ]
+        assert (
+            len(matching_lines) == 1
+        ), f"Expected component '{comp}' gap to appear exactly once, but found {len(matching_lines)}: {matching_lines}"
+
+    # Verify no redundant duplicate warning alert blocks were rendered for component missing gaps
+    warning_texts = [str(item.value) for item in app.warning]
+    for comp in components:
+        assert not any(
+            f"{comp}：缺少" in w for w in warning_texts
+        ), f"Component '{comp}' unexpectedly repeated in warning alerts: {warning_texts}"
+
+
+def test_settings_workspace_notification_and_schedule_buttons(tmp_path: Path, monkeypatch) -> None:
+    """Verify schedule action buttons and notification controls render and interact cleanly."""
+    runtime = tmp_path / "runtime"
+    monkeypatch.setenv("STOCK_TOOL_USER_DATA_DIR", str(runtime))
+    app = AppTest.from_string("""
+import os
+from datetime import datetime, timezone
+import streamlit as st
+from pathlib import Path
+from types import SimpleNamespace
+from stock_tool.application.daily_research_scheduler import DailyScheduleSettings
+from stock_tool.application.settings_workspace import SettingsWorkspaceApplicationService
+from stock_tool.dashboard.pages.settings_workspace import render_settings_workspace
+from stock_tool.runtime_paths import RuntimePaths
+
+paths = RuntimePaths(Path(os.environ["STOCK_TOOL_USER_DATA_DIR"]))
+service = SettingsWorkspaceApplicationService(paths, database_path=paths.processed_dir / "stock_data.sqlite", environment={})
+
+# Mock notification service
+notif_service = SimpleNamespace(
+    settings=lambda: SimpleNamespace(enabled=True),
+    status=lambda: SimpleNamespace(capability_available=True, settings_warning=None, last_status="sent", last_reason=None),
+    set_enabled=lambda val: None,
+    send_test_notification=lambda: SimpleNamespace(status="sent"),
+)
+
+# Mock schedule service
+schedule_service = SimpleNamespace(
+    settings=lambda: DailyScheduleSettings.default(),
+    state=lambda: SimpleNamespace(status="enabled"),
+    latest_run=lambda: SimpleNamespace(status="completed", data_as_of="2026-08-29", output_brief_fingerprint="abc"),
+    plan=lambda: SimpleNamespace(command=["python.exe", "daily_research.py"]),
+    adapter=SimpleNamespace(task_name="StockToolDailyResearch"),
+    now_fn=lambda: datetime(2026, 8, 29, 10, 0, 0, tzinfo=timezone.utc),
+    enable=lambda: None,
+    disable=lambda: None,
+    run_now=lambda: SimpleNamespace(status="success"),
+    uninstall=lambda: None,
+)
+
+render_settings_workspace(
+    st,
+    service=service,
+    daily_schedule_service=schedule_service,
+    daily_notification_service=notif_service,
+    refresh_callback=lambda: service.refresh(),
+)
+""").run(timeout=20)
+
+    assert not app.exception
+
+    # Test daily schedule run now
+    if app.button(key="daily_schedule_run_now"):
+        app.button(key="daily_schedule_run_now").click().run(timeout=20)
+        assert not app.exception
+
+    # Test daily schedule uninstall warning when checkbox not checked
+    if app.button(key="daily_schedule_uninstall"):
+        app.button(key="daily_schedule_uninstall").click().run(timeout=20)
+        assert not app.exception
+        assert any("請先勾選確認方塊" in str(w.value) for w in app.warning)
+
+    # Test daily schedule uninstall when confirmed
+    if app.checkbox(key="daily_schedule_uninstall_confirm"):
+        app.checkbox(key="daily_schedule_uninstall_confirm").check().run(timeout=20)
+        app.button(key="daily_schedule_uninstall").click().run(timeout=20)
+        assert not app.exception
+
+    # Test notifications buttons
+    if app.button(key="daily_notifications_test"):
+        app.button(key="daily_notifications_test").click().run(timeout=20)
+        assert not app.exception

@@ -18,6 +18,14 @@ from stock_tool.dashboard.backtest_ui import (
     cost_assumptions,
     resolve_cost_preset,
 )
+from stock_tool.dashboard.presentation_mapper import (
+    aggregate_fold_warnings,
+    format_market_label,
+    format_parameters_zh,
+    format_percentage,
+    format_status_label,
+    format_taiwan_company_display,
+)
 from stock_tool.dashboard.state import navigate_to_workspace
 from stock_tool.domain.models import Market, Symbol
 from stock_tool.strategies.registry import (
@@ -25,6 +33,24 @@ from stock_tool.strategies.registry import (
     create_strategy,
     strategy_display_labels,
 )
+
+
+def _safe_expander(st: Any, label: str, expanded: bool = False) -> Any:
+    expander = getattr(st, "expander", None)
+    if callable(expander):
+        try:
+            return expander(label, expanded=expanded)
+        except TypeError:
+            return expander(label)
+    return _null_context()
+
+
+class _null_context:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
 
 
 def render_strategy_workspace(
@@ -48,6 +74,10 @@ def render_strategy_workspace(
         return
 
     symbol, stock_data, market = _select_loaded_symbol(st, prices)
+    if not symbol:
+        st.info("目前載入的資料中無可供回測之個別股票；請先至研究首頁載入個股資料。")
+        return
+
     if on_research is not None and st.button(
         "返回研究目前資料", key="strategy_workspace_return_research"
     ):
@@ -193,15 +223,23 @@ def _select_loaded_symbol(st: Any, prices: pd.DataFrame) -> tuple[str, pd.DataFr
     identities = _loaded_identities(prices)
     if not identities:
         return "", prices.iloc[0:0].copy(), "UNKNOWN"
+
+    # Filter out benchmark indices (like OTC, TAIEX, SPX, ^GSPC) unless only benchmark is loaded
+    benchmarks = {"TPEX / OTC", "TWSE / TAIEX", "US / SPX", "US / ^GSPC"}
+    individual_stocks = [ident for ident in identities if ident not in benchmarks]
+    candidate_identities = individual_stocks if individual_stocks else identities
+
     preferred = _preferred_identity(st)
     active = str(st.session_state.get("strategy_workspace_identity") or "")
     default = (
-        preferred if preferred in identities else active if active in identities else identities[0]
+        preferred
+        if preferred in candidate_identities
+        else active if active in candidate_identities else candidate_identities[0]
     )
     identity = st.selectbox(
         "已載入標的（市場 / 代號）",
-        identities,
-        index=identities.index(default),
+        candidate_identities,
+        index=candidate_identities.index(default),
         key="strategy_workspace_identity",
     )
     market, symbol = (part.strip() for part in str(identity).split("/", 1))
@@ -353,9 +391,10 @@ def _render_cost_controls(st: Any, market: str) -> dict[str, Any]:
 
 
 def _render_data_state(st: Any, data: StrategyDataSnapshot) -> None:
+    company_name = format_taiwan_company_display(data.symbol, market=data.market)
     st.caption(
-        f"標的：{data.symbol or '資料不足'}；市場：{data.market}；來源：{data.source or '資料不足'}；"
-        f"期間：{data.start or '資料不足'} 至 {data.end or '資料不足'}；資料筆數：{data.rows}；狀態：{data.status}"
+        f"標的：{company_name}｜市場：{format_market_label(data.market)}｜來源：{data.source or '資料不足'}｜"
+        f"期間：{data.start or '資料不足'} 至 {data.end or '資料不足'}｜資料筆數：{data.rows}｜狀態：{format_status_label(data.status)}"
     )
     if data.missing_fields:
         st.warning("資料不足：缺少 " + ", ".join(data.missing_fields))
@@ -404,38 +443,61 @@ def _render_run(
     st.subheader("標準回測結果")
     if run.result is not None:
         metrics = run.result.metrics
-        st.write(
-            f"總報酬：{metrics.total_return:.2%}；最大回撤：{metrics.max_drawdown:.2%}；"
-            f"交易次數：{metrics.number_of_trades}；資料期間：{run.manifest.core['data']['start']} 至 {run.manifest.core['data']['end']}"
+        cols = st.columns(4)
+        cols[0].metric(
+            "總報酬",
+            format_percentage(metrics.total_return, with_sign=True, is_ratio=True),
         )
-    st.caption(f"健檢狀態：{run.health_status}；manifest digest：{run.manifest.digest}")
+        cols[1].metric(
+            "最大回撤",
+            format_percentage(metrics.max_drawdown, is_ratio=True),
+        )
+        cols[2].metric("交易次數", str(metrics.number_of_trades))
+        data_period = f"{run.manifest.core['data']['start']} 至 {run.manifest.core['data']['end']}"
+        cols[3].metric("資料期間", data_period)
+
     health = getattr(run, "health", None)
     if health is not None:
-        oos_status = health.out_of_sample.status if health.out_of_sample is not None else "blocked"
+        st.subheader("策略健檢摘要")
+        oos_status_zh = format_status_label(
+            health.out_of_sample.status if health.out_of_sample is not None else "blocked"
+        )
         fold_count = len(health.walk_forward.folds) if health.walk_forward is not None else 0
         sensitivity_count = len(health.sensitivity.runs) if health.sensitivity is not None else 0
+        health_status_zh = format_status_label(health.status)
         st.info(
-            f"樣本外：{oos_status}；Walk-forward folds：{fold_count}；"
-            f"敏感度組合：{sensitivity_count}；完整健檢狀態：{health.status}。"
+            f"樣本外：{oos_status_zh}｜Walk-forward 測試：{fold_count} 個 Fold｜"
+            f"參數敏感度：{sensitivity_count} 組組合｜整體健檢：{health_status_zh}。"
         )
+        raw_warnings: list[str] = []
         for warning in (
             *getattr(health.out_of_sample, "warnings", ()),
             *getattr(health.walk_forward, "warnings", ()),
             *getattr(health.sensitivity, "warnings", ()),
         ):
-            st.warning(getattr(warning, "message", str(warning)))
+            raw_warnings.append(getattr(warning, "message", str(warning)))
+
+        aggregated_warnings = aggregate_fold_warnings(raw_warnings, total_folds=fold_count)
+        for warning_msg in aggregated_warnings:
+            st.warning(warning_msg)
+
         _render_health_details(st, health)
-    st.download_button(
-        "下載可重現 manifest",
-        data=run.manifest.to_json(),
-        file_name="strategy-run-manifest.json",
-        mime="application/json",
-        key="strategy_workspace_manifest_download",
-    )
+
+    with _safe_expander(st, "詳細資料與可重現 Manifest", expanded=False):
+        st.caption(
+            f"健檢狀態：{format_status_label(run.health_status)}｜Manifest Digest：{run.manifest.digest}"
+        )
+        st.download_button(
+            "下載可重現 manifest",
+            data=run.manifest.to_json(),
+            file_name="strategy-run-manifest.json",
+            mime="application/json",
+            key="strategy_workspace_manifest_download",
+        )
 
 
 def _render_health_details(st: Any, health: StrategyHealthRun) -> None:
-    """Render every validation result, never only aggregate counts."""
+    """Render every validation result with clear Fold details and localized parameter labels."""
 
     if health.out_of_sample is not None and health.out_of_sample.in_sample is not None:
         train = health.out_of_sample.in_sample.metrics
@@ -444,30 +506,40 @@ def _render_health_details(st: Any, health: StrategyHealthRun) -> None:
             if health.out_of_sample.out_of_sample
             else None
         )
-        st.write(
-            "樣本內／樣本外："
-            f"樣本內報酬 {train.total_return:.2%}、回撤 {train.max_drawdown:.2%}、交易 {train.number_of_trades}；"
-            f"樣本外報酬 {test.total_return:.2%}、回撤 {test.max_drawdown:.2%}、交易 {test.number_of_trades}。"
-            if test is not None
-            else "樣本外結果不可用。"
-        )
-    if health.walk_forward is not None:
-        st.markdown("**Walk-forward 各 fold**")
-        for fold in health.walk_forward.folds:
-            metrics = fold.test_run.metrics
-            st.write(
-                f"Fold {fold.fold_number}：{fold.test_period.start} 至 {fold.test_period.end}；"
-                f"狀態 ready；報酬 {metrics.total_return:.2%}；回撤 {metrics.max_drawdown:.2%}；"
-                f"交易 {metrics.number_of_trades}。"
-            )
-    if health.sensitivity is not None:
-        st.markdown("**參數敏感度各組合**")
-        for item in health.sensitivity.runs:
-            metrics = item.run.metrics
-            st.write(
-                f"參數 {dict(item.parameters)}；報酬 {metrics.total_return:.2%}；"
-                f"回撤 {metrics.max_drawdown:.2%}；交易 {metrics.number_of_trades}。"
-            )
+        if test is not None:
+            cols = st.columns(2)
+            with cols[0]:
+                st.markdown("**樣本內表現 (In-Sample)**")
+                st.write(
+                    f"報酬：{train.total_return:+.2%}｜回撤：{train.max_drawdown:.2%}｜交易：{train.number_of_trades} 次"
+                )
+            with cols[1]:
+                st.markdown("**樣本外驗證 (Out-of-Sample)**")
+                st.write(
+                    f"報酬：{test.total_return:+.2%}｜回撤：{test.max_drawdown:.2%}｜交易：{test.number_of_trades} 次"
+                )
+        else:
+            st.info("樣本外驗證結果不可用。")
+
+    with _safe_expander(st, "Walk-forward 各 Fold 與參數敏感度明細", expanded=False):
+        if health.walk_forward is not None:
+            st.markdown("**Walk-forward 各 Fold 明細**")
+            for fold in health.walk_forward.folds:
+                metrics = fold.test_run.metrics
+                st.write(
+                    f"Fold {fold.fold_number}（{fold.test_period.start} 至 {fold.test_period.end}）："
+                    f"報酬 {metrics.total_return:+.2%}｜回撤 {metrics.max_drawdown:.2%}｜"
+                    f"交易 {metrics.number_of_trades} 次。"
+                )
+        if health.sensitivity is not None:
+            st.markdown("**參數敏感度各組合測試**")
+            for item in health.sensitivity.runs:
+                metrics = item.run.metrics
+                param_label = format_parameters_zh(dict(item.parameters))
+                st.write(
+                    f"{param_label} → 報酬 {metrics.total_return:+.2%}｜"
+                    f"回撤 {metrics.max_drawdown:.2%}｜交易 {metrics.number_of_trades} 次。"
+                )
 
 
 def _with_health(

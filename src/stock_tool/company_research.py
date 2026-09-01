@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from time import monotonic
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 import yfinance as yf
 
@@ -311,6 +311,42 @@ FOCUS_RULES = {
 }
 
 
+def _is_english_or_provider_name(name: str) -> bool:
+    """Detect if a company name is an English/provider ASCII name rather than localized Chinese."""
+    if not name:
+        return True
+    for ch in name:
+        if "\u4e00" <= ch <= "\u9fff":
+            return False
+    return True
+
+
+KNOWN_TAIWAN_COMPANIES: Mapping[str, str] = {
+    "2330": "台積電",
+    "2454": "聯發科",
+    "2303": "聯電",
+    "3711": "日月光投控",
+    "2382": "廣達",
+    "3231": "緯創",
+    "6669": "緯穎",
+    "2317": "鴻海",
+    "6488": "環球晶",
+    "3105": "穩懋",
+    "2308": "台達電",
+    "2412": "中華電",
+    "2881": "富邦金",
+    "2882": "國泰金",
+    "2891": "中信金",
+    "1301": "台塑",
+    "1303": "南亞",
+    "2002": "中鋼",
+    "2603": "長榮",
+    "2609": "陽明",
+    "TAIEX": "發行量加權股價指數",
+    "OTC": "櫃買指數",
+}
+
+
 def build_company_research_profile(
     symbol: str,
     *,
@@ -344,12 +380,22 @@ def build_company_research_profile(
         if fetch_error:
             limitations.append(fetch_error)
 
-    company_name = _first_text(
+    raw_name = _first_text(
         fetched_info.get("longName"),
         fetched_info.get("shortName"),
         fetched_info.get("displayName"),
         symbol_text,
     )
+    if (
+        not raw_name
+        or raw_name == symbol_text
+        or raw_name.lower() == "none"
+        or _is_english_or_provider_name(raw_name)
+    ):
+        known_name = KNOWN_TAIWAN_COMPANIES.get(symbol_text)
+        company_name = known_name or raw_name
+    else:
+        company_name = raw_name
     sector = _label(fetched_info.get("sector") or fetched_info.get("sectorDisp"))
     industry = _label(fetched_info.get("industry") or fetched_info.get("industryDisp"))
     website = str(fetched_info.get("website") or "").strip()

@@ -69,7 +69,7 @@ def test_streamlit_config_disables_implicit_multipage_sidebar_navigation() -> No
     config = (Path(__file__).parents[1] / ".streamlit" / "config.toml").read_text(encoding="utf-8")
 
     assert "showSidebarNavigation = false" in config
-    assert 'toolbarMode = "auto"' in config
+    assert 'toolbarMode = "minimal"' in config
     spec = (Path(__file__).parents[1] / "StockTool.spec").read_text(encoding="utf-8")
     assert "('.streamlit\\\\config.toml', '.streamlit')" in spec
     assert "('.streamlit\\\\', '.streamlit')" not in spec
@@ -209,12 +209,12 @@ def test_workspace_overviews_show_action_cards_and_open_existing_entrypoints(
 
     app.radio[0].set_value("持倉").run(timeout=20)
     assert not app.exception
-    assert any(item.value == "持倉工作區" for item in app.title)
+    assert any(item.value == "持倉" for item in app.title)
     assert any(item.label == "加入／更新持股" for item in app.button)
 
     app.radio[0].set_value(PRIMARY_NAVIGATION[-1].label).run(timeout=20)
     assert not app.exception
-    assert any(item.value == "設定與資料健康" for item in app.title)
+    assert any(item.value == "設定" for item in app.title)
     assert any(item.label == "重新檢查本機狀態" for item in app.button)
 
 
@@ -286,7 +286,7 @@ def test_home_primary_actions_select_the_retained_child_pages(tmp_path: Path, mo
     next(button for button in app.button if button.label == "查看持倉").click().run(timeout=20)
 
     assert app.radio[0].value == "持倉"
-    assert any(item.value == "持倉工作區" for item in app.title)
+    assert any(item.value == "持倉" for item in app.title)
     assert any(item.label == "加入／更新持股" for item in app.button)
 
     app.radio[0].set_value("研究首頁").run(timeout=20)
