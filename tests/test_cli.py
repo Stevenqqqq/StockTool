@@ -13,7 +13,7 @@ from stock_tool.cli import main
 def test_cli_version_uses_the_package_canonical_version(capsys: CaptureFixture[str]) -> None:
     assert main(["--version"]) == 0
     captured = capsys.readouterr()
-    assert captured.out.strip() == "1.4.0"
+    assert captured.out.strip() == "1.4.1"
 
 
 def test_python_module_cli_help_runs() -> None:

@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 def test_package_init_is_the_canonical_v1_2_version_source() -> None:
     project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
-    assert __version__ == "1.4.0"
+    assert __version__ == "1.4.1"
     assert project["project"]["dynamic"] == ["version"]
     assert project["tool"]["setuptools"]["dynamic"]["version"] == {"attr": "stock_tool.__version__"}
     assert version("stock-analysis-tool") == __version__

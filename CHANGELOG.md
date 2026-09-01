@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.1 - 2026-09-01
+
+- Promoted the independently accepted Sprint 34 candidate as the personal
+  v1.4.1 release package without changing research behavior or data contracts.
+- Rebuilt the stable entry, payload, installer and release evidence from one
+  version-bound source manifest.
+
 ## 1.4.0 - 2026-08-28
 
 - Added the Prediction Lab with evidence-bound 5/20-session evaluation,

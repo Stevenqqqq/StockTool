@@ -91,22 +91,22 @@ def test_release_distribution_accepts_and_binds_the_stable_entry_layout(tmp_path
     (stage / "StockTool.exe").write_bytes(b"stable")
     (payload / "StockToolPayload.exe").write_bytes(b"payload")
     copy_release_assets(source, payload)
-    shutil.copytree(payload, stage / "versions" / "1.4.0")
+    shutil.copytree(payload, stage / "versions" / "1.4.1")
     (stage / "current-version.json").write_text(
         json.dumps(
             {
-                "version": "1.4.0",
-                "payload": "versions/1.4.0/StockToolPayload.exe",
+                "version": "1.4.1",
+                "payload": "versions/1.4.1/StockToolPayload.exe",
             }
         ),
         encoding="utf-8",
     )
 
-    validate_release_distribution(stage, run_version=lambda _command: "1.4.0")
+    validate_release_distribution(stage, run_version=lambda _command: "1.4.1")
 
-    (stage / "versions" / "1.4.0" / "README.md").write_text("tampered", encoding="utf-8")
+    (stage / "versions" / "1.4.1" / "README.md").write_text("tampered", encoding="utf-8")
     with pytest.raises(ValueError, match="does not match Payload"):
-        validate_release_distribution(stage, run_version=lambda _command: "1.4.0")
+        validate_release_distribution(stage, run_version=lambda _command: "1.4.1")
 
 
 def test_release_distribution_accepts_the_legacy_onedir_layout(tmp_path: Path) -> None:

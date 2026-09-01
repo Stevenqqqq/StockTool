@@ -2,9 +2,9 @@
 
 這是一套研究、學習、風險分析與輔助判斷用途的股票分析工具。它不是投資顧問，不承諾任何收益，不自動下單，也不構成個人化投資建議。歷史資料與回測結果不代表未來報酬。
 
-## v1.4.0 正式版
+## v1.4.1 正式版
 
-v1.4.0 已於 2026-08-29 正式發布，整合已驗收的 Prediction Lab、5/20 交易日結果追蹤、官方市場日曆、
+v1.4.1 延續已驗收的 Prediction Lab、5/20 交易日結果追蹤、官方市場日曆、
 market-qualified benchmark 與公司行動 fail-closed 邊界。Windows 安裝程式仍未簽章；
 安裝時顯示未知發行者不代表程式已取得系統管理員權限。
 
@@ -324,12 +324,12 @@ Copy-Item .env.example .env
 
 ## Windows EXE 打包與啟動
 
-### v1.4.0 Windows 發布流程
+### v1.4.1 Windows 發布流程
 
 `build_exe.bat` 只會建立 `release\staging\StockTool\`，不會刪除或覆寫目前的正式
 `release\StockTool\`。完成 staging 驗證後，再執行 `publish_release.bat`；它會先建立唯一時間戳的
 `release\rollback\StockTool-pre-sprint12-release-YYYYMMDD-HHMMSS\` rollback 備份並驗證，再提升 staging 成品。
-正式 EXE 路徑為 `release\StockTool\StockTool.exe`，目前發布目標為 `v1.4.0`。發布前的
+正式 EXE 路徑為 `release\StockTool\StockTool.exe`，目前發布目標為 `v1.4.1`。發布前的
 正式成品會保留在本次時間戳 rollback 目錄，promotion 過程中的舊正式版也會保留在非破壞性的
 promotion hold。若 promotion 後的資產或 EXE 雜湊檢查失敗，腳本會將舊正式版恢復。
 

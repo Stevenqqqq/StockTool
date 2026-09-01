@@ -1937,3 +1937,20 @@ v3：能以安全、可安裝、可更新且有引用的智慧研究產品正式
 ```
 
 任何 Sprint 若無法提升「可信、可追溯、可重現、可交付」其中至少一項，就不應進入本 Roadmap。
+
+### Sprint 30.2 — 個人正式使用版 v1.4.1 發布收尾
+
+**Scope:** 僅處理已驗收 Sprint 34 候選的版本提升、發布文件、可重現乾淨建置、
+unsigned internal-test installer 與 hash-bound 發布證據。產品功能、研究資料契約與
+使用者介面行為不變；正式 v1.2.2 release 在 CTO 驗收前保持 byte-for-byte 不變。
+
+**Non-goals:** 不新增 provider、AI、交易、預測邏輯、排程或 UI redesign，不變更資料庫、
+Portfolio、Watchlist、Research Library、正式排程或使用者資料，不進行簽章或公開發布。
+
+**Rollback:** 保留正式 v1.2.2 與既有 v1.3.0／v1.4.0 可恢復成品；若 v1.4.1 staging 或
+安裝生命週期不符合驗收，移除隔離 staging／installer 並維持現有正式成品與使用者資料。
+
+**Acceptance:** package、stable launcher、payload、installer、README、CHANGELOG、
+manifest 與 CLI 版本一致；staging smoke、安裝／repair／upgrade rehearsal／uninstall、
+privacy、performance、source archive、browser 與 real-data zero-diff 證據均以同一來源
+manifest 綁定。正式 promotion、簽章與 GitHub Release 僅在 CTO 驗收後執行。

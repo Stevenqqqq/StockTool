@@ -292,7 +292,7 @@ def test_version_resource_installer_and_manifest_use_one_canonical_version() -> 
     assert "StockTool.spec" in build
     assert "--name StockTool" not in build
     assert 'f"/DMyAppVersion={__version__}"' in installer_build
-    assert windows_version_tuple() == "1, 4, 0, 0"
+    assert windows_version_tuple() == "1, 4, 1, 0"
 
 
 def test_manifest_template_declares_all_generated_fields() -> None:
