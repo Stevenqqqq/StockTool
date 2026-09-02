@@ -2,4 +2,4 @@
 # Keep these bounds synchronized with Sprint 19.1.1 vulnerability remediation.
 GitPython>=3.1.58,<4
 Pillow>=12.3.0,<13
-pypdf>=6.15.0,<7
+pypdf>=6.16.1,<7

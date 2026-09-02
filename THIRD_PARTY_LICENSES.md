@@ -9,7 +9,7 @@ guess a license from a package name.
 | --- | --- | --- |
 | openpyxl | `>=3.1.0` | Installed distribution metadata (MIT) |
 | pandas | `>=2.2.0` | Installed distribution metadata (BSD-3-Clause text) |
-| pypdf | `>=5.0.0` | Installed distribution metadata / bundled license files |
+| pypdf | `>=6.16.1,<7` | Installed distribution metadata / bundled license files |
 | streamlit | `>=1.36.0` | Installed distribution metadata / bundled license files |
 | yfinance | `>=0.2.40` | Installed distribution metadata (Apache) |
 

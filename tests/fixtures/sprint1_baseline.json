@@ -1,5 +1,5 @@
 {
-  "package_version": "1.4.1",
+  "package_version": "1.4.2",
   "feature_flags": {
     "legacy_dashboard_enabled": true,
     "research_workspace_enabled": false

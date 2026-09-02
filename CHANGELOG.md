@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.4.2 - 2026-09-03 (approved personal release)
+
+- Raised the pypdf security floor to 6.16.1 without changing product behavior,
+  research contracts, or user data.
+- Rebuilt the release metadata and installer bindings for the v1.4.2 personal
+  release approved by the user on 2026-09-03.
+- Recorded the lifecycle-equivalence waiver approved by the user on 2026-09-03:
+  this is a pypdf-only security update, installer source and behavior are
+  unchanged, the v1.4.1 installer lifecycle was previously accepted, and no
+  safe host security VM was available. The complete clean-install, repair,
+  upgrade and uninstall matrix is not claimed. Formal delivery did complete a
+  current-host silent upgrade, installed/shortcut verification and isolated
+  installed smoke; all pre-existing user-data files remained byte-identical.
+
 ## 1.4.1 - 2026-09-01
 
 - Promoted the independently accepted Sprint 34 candidate as the personal

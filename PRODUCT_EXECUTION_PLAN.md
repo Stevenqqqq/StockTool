@@ -1954,3 +1954,27 @@ Portfolio、Watchlist、Research Library、正式排程或使用者資料，不�
 manifest 與 CLI 版本一致；staging smoke、安裝／repair／upgrade rehearsal／uninstall、
 privacy、performance、source archive、browser 與 real-data zero-diff 證據均以同一來源
 manifest 綁定。正式 promotion、簽章與 GitHub Release 僅在 CTO 驗收後執行。
+
+### Sprint 34 — v1.4.2 pypdf 安全修正正式個人發布（2026-09-03 已核准）
+
+**Scope:** 僅將 runtime `pypdf` 安全下限提升至 `>=6.16.1,<7`，同步套件、CLI、
+文件、installer 與 staging evidence 版本 authority；不改變已驗收的產品行為、研究契約、
+provider、排程或使用者資料。
+
+**Non-goals:** 不修改 installer 行為、Portfolio、Watchlist、Research Library、UI 或任何
+資料內容，不簽章、不公開發布；僅依使用者 2026-09-03 的明確核准執行本機正式 promotion、
+既有安裝版升級與私人 GitHub 同步。
+
+**Rollback:** 保留既有 v1.4.1 commit/tag、正式成品 rollback 與安裝目錄備份；如 promotion
+或升級驗證失敗，從已驗證備份恢復 v1.4.1，不觸碰真實資料。
+
+**Lifecycle-equivalence waiver（2026-09-03）:** 使用者已核准本次豁免完整的 fresh v1.4.2
+clean-install／repair／upgrade／uninstall replay 矩陣，理由是本次僅為 pypdf 安全更新、installer
+source 與 behavior 未變、v1.4.1 lifecycle 已通過，且主機沒有安全 VM 可供重播。此豁免不把
+未執行的完整矩陣冒充為已執行；正式交付仍已完成目前主機的靜默升級、installed EXE／捷徑與
+隔離啟動 smoke 驗證。
+
+**Acceptance:** pypdf 6.16.1 安裝、pip check／pip-audit 零漏洞、版本與 hash-bound
+candidate/source/installer、隔離 EXE smoke 與 privacy 證據全部通過；253 個既有 real-data
+檔案維持 byte-identical，promotion 僅新增一份非破壞性的 legacy-migration audit record。
+v1.4.1 lifecycle evidence 依上述等價豁免承接，v1.4.2 已核准並正式交付為個人發布版。
