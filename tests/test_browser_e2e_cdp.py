@@ -15,6 +15,8 @@ from typing import Any
 
 import websockets
 
+CDP_COMMAND_TIMEOUT_SECONDS = 10.0
+
 
 def classify_browser_console_events(
     events: list[dict[str, Any]],
@@ -110,29 +112,72 @@ class CDPBrowser:
     def __init__(self, port: int, user_data_dir: Path):
         self.port = port
         self.user_data_dir = user_data_dir
+        self.stderr_path = user_data_dir.parent / "browser_stderr.log"
+        self._stderr_handle: Any = None
         self.proc: subprocess.Popen | None = None
         self.ws: Any = None
         self.msg_id = 0
         self.events: list[dict[str, Any]] = []
 
+    def _stderr_tail(self, *, max_lines: int = 12, max_chars: int = 4000) -> str:
+        """Return a bounded, path-redacted browser stderr tail for failures."""
+
+        if self._stderr_handle is not None:
+            self._stderr_handle.flush()
+        try:
+            text = self.stderr_path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            return f"<stderr unavailable: {type(exc).__name__}>"
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        tail = "\n".join(lines[-max_lines:]).strip()
+        for path in (self.user_data_dir, self.stderr_path, self.stderr_path.parent):
+            tail = tail.replace(str(path), "<isolated_tmp>")
+        if len(tail) > max_chars:
+            tail = "..." + tail[-max_chars:]
+        return tail or "<stderr empty>"
+
+    def _startup_failure(self, last_error: BaseException | None) -> RuntimeError:
+        exit_code = self.proc.poll() if self.proc is not None else None
+        detail = str(last_error) if last_error is not None else "no response"
+        return RuntimeError(
+            "Failed to connect to browser CDP debugger "
+            f"(exit_code={exit_code!r}; last_error={detail!r}; "
+            f"stderr_tail={self._stderr_tail()})"
+        )
+
+    def _close_stderr(self) -> None:
+        if self._stderr_handle is None:
+            return
+        self._stderr_handle.flush()
+        self._stderr_handle.close()
+        self._stderr_handle = None
+
     async def start(self):
         exe = find_browser_exe()
-        self.proc = subprocess.Popen(
-            [
-                exe,
-                "--headless=new",
-                f"--remote-debugging-port={self.port}",
-                f"--user-data-dir={self.user_data_dir}",
-                "--disable-gpu",
-                "--no-first-run",
-                "--no-default-browser-check",
-                "--window-size=1280,900",
-                "about:blank",
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        self.stderr_path.parent.mkdir(parents=True, exist_ok=True)
+        self._stderr_handle = self.stderr_path.open("wb")
+        try:
+            self.proc = subprocess.Popen(
+                [
+                    exe,
+                    "--headless=new",
+                    f"--remote-debugging-port={self.port}",
+                    f"--user-data-dir={self.user_data_dir}",
+                    "--disable-gpu",
+                    "--in-process-gpu",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--window-size=1280,900",
+                    "about:blank",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=self._stderr_handle,
+            )
+        except Exception:
+            self._close_stderr()
+            raise
         url = f"http://127.0.0.1:{self.port}/json/list"
+        last_error: BaseException | None = None
         for _ in range(30):
             try:
                 with urllib.request.urlopen(url, timeout=1) as response:
@@ -144,26 +189,45 @@ class CDPBrowser:
                     ]
                     if page_targets:
                         page_ws_url = page_targets[0]["webSocketDebuggerUrl"]
-                        self.ws = await websockets.connect(page_ws_url, max_size=50_000_000)
+                        self.ws = await websockets.connect(
+                            page_ws_url,
+                            max_size=50_000_000,
+                            open_timeout=CDP_COMMAND_TIMEOUT_SECONDS,
+                        )
                         await self.send("Page.enable")
                         await self.send("Runtime.enable")
                         await self.send("DOM.enable")
                         await self.send("Log.enable")
                         return
-            except Exception:
+            except Exception as exc:
+                last_error = exc
+                if self.ws is not None:
+                    raise
+                if self.proc.poll() is not None:
+                    raise self._startup_failure(last_error) from exc
                 await asyncio.sleep(0.3)
-        raise RuntimeError("Failed to connect to browser CDP debugger.")
+        raise self._startup_failure(last_error)
 
     async def send(self, method: str, params: dict | None = None) -> dict:
         self.msg_id += 1
         payload = {"id": self.msg_id, "method": method, "params": params or {}}
-        await self.ws.send(json.dumps(payload))
-        while True:
-            raw = await self.ws.recv()
-            data = json.loads(raw)
-            if data.get("id") == payload["id"]:
-                return data
-            self.events.append(data)
+        deadline = asyncio.get_running_loop().time() + CDP_COMMAND_TIMEOUT_SECONDS
+        try:
+            remaining = max(deadline - asyncio.get_running_loop().time(), 0.001)
+            await asyncio.wait_for(self.ws.send(json.dumps(payload)), timeout=remaining)
+            while True:
+                remaining = max(deadline - asyncio.get_running_loop().time(), 0.001)
+                raw = await asyncio.wait_for(self.ws.recv(), timeout=remaining)
+                data = json.loads(raw)
+                if data.get("id") == payload["id"]:
+                    return data
+                self.events.append(data)
+        except asyncio.TimeoutError as exc:
+            exit_code = self.proc.poll() if self.proc is not None else None
+            raise RuntimeError(
+                f"CDP command timed out: method={method!r}; "
+                f"exit_code={exit_code!r}; stderr_tail={self._stderr_tail()}"
+            ) from exc
 
     async def evaluate(self, expression: str):
         res = await self.send(
@@ -212,6 +276,7 @@ class CDPBrowser:
             except Exception:
                 self.proc.kill()
                 self.proc.wait(timeout=3)
+        self._close_stderr()
 
 
 def test_real_browser_e2e_and_scroll_to_top(tmp_path: Path, monkeypatch):

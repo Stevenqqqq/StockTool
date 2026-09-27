@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pandas.testing as pdt
+import pytest
 
 import stock_tool.dashboard.app as dashboard_app
 from stock_tool.data.auto_fetch import FetchResult, ProviderAttempt
@@ -822,6 +823,58 @@ def test_dashboard_company_research_profile_is_cached(monkeypatch, tmp_path) -> 
 
     assert first is second
     assert calls == [("AAPL", "US")]
+
+
+def test_company_document_refresh_reuses_confirmed_identity_and_preserves_other_cache(
+    monkeypatch, tmp_path
+):
+    from dataclasses import replace
+    from stock_tool.company_documents import CompanyDocument
+    from stock_tool.company_dossier import build_dossier
+    from stock_tool.company_research import build_company_research_profile
+
+    profile = build_company_research_profile(
+        "MU",
+        market="US",
+        info={
+            "symbol": "MU",
+            "longName": "Micron",
+            "quoteType": "EQUITY",
+            "industry": "Semiconductors",
+            "website": "https://example.com",
+        },
+    )
+    doc = CompanyDocument(
+        "https://example.com",
+        "產品介紹",
+        "本公司提供DDR4記憶體與相關產品。",
+        "",
+        datetime.now(UTC).isoformat(),
+    )
+    profile = replace(profile, dossier=build_dossier("MU", "US", doc.url, (doc,)))
+    calls = []
+
+    def collect(symbol, market, website, **kwargs):
+        calls.append((symbol, market, website, kwargs["force"]))
+        return build_dossier(symbol, market, website, (doc,))
+
+    monkeypatch.setattr("stock_tool.company_research.collect_dossier", collect)
+    monkeypatch.setattr(
+        "stock_tool.company_research._fetch_company_info",
+        lambda *a, **k: pytest.fail("confirmed website refresh repeated metadata fetch"),
+    )
+    monkeypatch.setattr(dashboard_app, "_canonical_concept_relations", lambda *a: ())
+    fake = _FakeStreamlit()
+    other = object()
+    fake.session_state.update(
+        company_research_cache={"MU|US": profile, "OTHER|US": other},
+        company_details_force=True,
+        price_data_source={"market": "US", "user_symbol": "MU"},
+    )
+    current = _get_company_research_profile(fake, "MU")
+    assert calls == [("MU", "US", doc.url, True)]
+    assert current.dossier is not None
+    assert fake.session_state.company_research_cache["OTHER|US"] is other
 
 
 def test_dashboard_offline_cache_skips_fundamentals_and_company_metadata(

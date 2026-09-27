@@ -30,6 +30,16 @@ def render_global_search(
         (index for index, (_, code) in enumerate(MARKET_CHOICES) if code == default_market),
         0,
     )
+    # Apply a completed company switch before constructing widgets, not after
+    # submission. Preserve drafts while the displayed company stays unchanged.
+    state = getattr(st, "session_state", None)
+    if state is not None and key_prefix == "research" and default_symbol:
+        bound = (default_market, default_symbol)
+        marker = f"{key_prefix}_bound_identity"
+        if state.get(marker) != bound:
+            state[f"{key_prefix}_global_symbol"] = default_symbol
+            state[f"{key_prefix}_global_market"] = labels[default_index]
+            state[marker] = bound
     with st.form(key=f"{key_prefix}_global_search", clear_on_submit=False):
         symbol = st.text_input(
             "股票代號",

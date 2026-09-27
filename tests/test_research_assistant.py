@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 import pandas as pd
 
@@ -25,6 +26,38 @@ from stock_tool.stock_scoring import (
     ScoreComponent,
     StockScoreResult,
 )
+
+
+def test_large_local_note_remains_savable_with_exact_citations(tmp_path: Path):
+    from stock_tool.research.evidence import EvidenceBundle, EvidenceRecord
+    from stock_tool.research.library import ResearchLibrary
+
+    bundle = EvidenceBundle(
+        symbol="MU",
+        market="US",
+        snapshot_fingerprint="a" * 64,
+        evidence=tuple(
+            EvidenceRecord(
+                evidence_id=f"company.document.{index}",
+                kind=ClaimKind.FACT,
+                label="Product",
+                text=f"Product specification {index}",
+                source="Official website",
+                provider="Company",
+                symbol="MU",
+                market="US",
+            )
+            for index in range(48)
+        ),
+    )
+    note = AIResearchAssistant(cache=ResearchAssistantCache(tmp_path / "ai")).generate(bundle)
+    assert len(note.claims) <= 32
+    assert any(claim.section == "next_steps" for claim in note.claims)
+    library = ResearchLibrary(tmp_path / "library")
+    saved = library.save(bundle=bundle, note=note, title="Detailed company research")
+    restored = ResearchLibrary(tmp_path / "library").get(saved.library_entry_id)
+    assert restored is not None
+    assert restored.note == note
 
 
 def _snapshot():
@@ -120,6 +153,45 @@ def test_new_evidence_changes_fingerprint_but_deterministic_metrics_remain_read_
     assert first.fingerprint != second.fingerprint
     assert snapshot.composite_score == 72.0
     assert any(item.kind is ClaimKind.CALCULATION for item in first.evidence)
+
+
+def test_company_document_evidence_uses_own_dates_and_invalidates_ai_cache() -> None:
+    from stock_tool.company_documents import CompanyDocument
+    from stock_tool.company_dossier import build_dossier
+
+    snapshot = _snapshot()
+    doc = CompanyDocument(
+        "https://www.micron.com/products",
+        "產品介紹",
+        "本公司提供DDR4記憶體，容量4Gb。",
+        "",
+        "2026-09-10T01:00:00+00:00",
+    )
+    dossier = build_dossier("MU", "US", "https://www.micron.com", (doc,))
+    profile = replace(snapshot.company_profile, dossier=dossier)
+    current = build_evidence_bundle(replace(snapshot, company_profile=profile))
+    facts = [row for row in current.evidence if row.evidence_id.startswith("company.document.")]
+    assert facts and all(row.source == doc.url and row.url == doc.url for row in facts)
+    assert all(row.available_at is None and row.fetched_at == doc.fetched_at for row in facts)
+    assert any("DDR4" in row.text for row in facts)
+    stale = build_evidence_bundle(
+        replace(snapshot, company_profile=replace(profile, dossier=replace(dossier, state="stale")))
+    )
+    assert stale.fingerprint != current.fingerprint
+    assert all(
+        row.kind is ClaimKind.WARNING
+        for row in stale.evidence
+        if row.evidence_id.startswith("company.document.")
+    )
+    wrong = build_evidence_bundle(
+        replace(
+            snapshot,
+            company_profile=replace(
+                profile, dossier=replace(dossier, symbol="3006", market="TWSE")
+            ),
+        )
+    )
+    assert not any(row.evidence_id.startswith("company.document.") for row in wrong.evidence)
 
 
 def test_evidence_bundle_marks_missing_and_warning_without_promoting_them_to_facts() -> None:

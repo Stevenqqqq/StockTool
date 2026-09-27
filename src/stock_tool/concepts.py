@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from stock_tool.yfinance_runtime import configure_yfinance_cache
+
 import json
 import time
 import urllib.request
@@ -964,12 +966,14 @@ def _fetch_tpex_companies(*, timeout_seconds: int) -> pd.DataFrame:
 
 def _screen_yfinance_us(field: str, value: str, *, max_results: int) -> list[dict[str, object]]:
     query = EquityQuery("eq", [field, value])
+    configure_yfinance_cache()
     response = yf.screen(query, count=max_results, sortField="intradaymarketcap", sortAsc=False)
     quotes = response.get("quotes", []) if isinstance(response, dict) else []
     return [_quote_to_concept_row(quote, source=f"yfinance screen:{field}={value}") for quote in quotes if _is_us_equity(quote)]
 
 
 def _search_yfinance_us(query: str, *, max_results: int) -> list[dict[str, object]]:
+    configure_yfinance_cache()
     search = yf.Search(
         query,
         max_results=max_results,

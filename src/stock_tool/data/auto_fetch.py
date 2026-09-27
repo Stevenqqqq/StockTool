@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from stock_tool.yfinance_runtime import configure_yfinance_cache
+
 import json
 import os
 import urllib.parse
@@ -546,6 +548,7 @@ def _download_yfinance_history(
     interval: str,
     timeout_seconds: int,
 ) -> pd.DataFrame:
+    configure_yfinance_cache()
     return yf.download(
         query_symbol,
         start=start,

@@ -3171,6 +3171,20 @@ def _get_company_research_profile(st: Any, symbol: str) -> CompanyResearchProfil
     market = _infer_market_for_symbol(st, symbol)
     cache_key = f"{symbol}|{market}"
     cache = st.session_state.company_research_cache
+    cached_profile = cache.get(cache_key)
+    cached_dossier = getattr(cached_profile, "dossier", None)
+    refresh_details = bool(st.session_state.get("company_details_force", False))
+    if refresh_details:
+        cache.pop(cache_key, None)
+    if cached_dossier is not None:
+        try:
+            age = (
+                datetime.now(timezone.utc) - datetime.fromisoformat(cached_dossier.checked_at)
+            ).total_seconds()
+            if age < 0 or age >= 86400:
+                cache.pop(cache_key, None)
+        except (ValueError, TypeError):
+            cache.pop(cache_key, None)
     if cache_key not in cache:
         try:
             source = st.session_state.get("price_data_source") or {}
@@ -3184,8 +3198,23 @@ def _get_company_research_profile(st: Any, symbol: str) -> CompanyResearchProfil
             cache[cache_key] = build_company_research_profile(
                 symbol,
                 market=cast(ProviderMarket, market),
+                info=(
+                    {
+                        "symbol": cached_profile.provider_symbol,
+                        "longName": cached_profile.company_name,
+                        "sector": cached_profile.sector,
+                        "industry": cached_profile.industry,
+                        "website": cached_profile.website,
+                        "longBusinessSummary": cached_profile.business_summary,
+                        "quoteType": "EQUITY",
+                    }
+                    if refresh_details and cached_dossier is not None
+                    else None
+                ),
                 concept_relations=_canonical_concept_relations(st, symbol),
-                allow_remote_fetch=not offline_cache_fallback,
+                allow_remote_fetch=refresh_details or not offline_cache_fallback,
+                include_details=True,
+                refresh_details=bool(st.session_state.pop("company_details_force", False)),
             )
         except Exception as exc:
             cache[cache_key] = build_company_research_profile(
@@ -3272,6 +3301,12 @@ def _display_company_research_profile(st: Any, profile: CompanyResearchProfile) 
     """Render business, technology, application, and bottleneck notes."""
 
     st.markdown("#### 公司業務與產業脈絡")
+    if profile.dossier is not None:
+        from stock_tool.dashboard.components.company_dossier import render_company_dossier
+
+        st.write(profile.company_name)
+        render_company_dossier(st, profile.dossier)
+        return
     if not profile.is_available:
         st.warning("公司業務資料不足。請先用「全自動查詢 / 補資料」或確認股票代號與市場。")
 

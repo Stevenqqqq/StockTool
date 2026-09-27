@@ -9,21 +9,19 @@ from typing import Any, Callable
 import pandas as pd
 
 from stock_tool.application.portfolio_workspace import (
-    PortfolioDataStatus,
     PortfolioWorkspaceAnalysis,
     PortfolioWorkspaceApplicationService,
     PortfolioWorkspaceStressResult,
 )
 from stock_tool.portfolio_stress import StressScenario, StressScenarioType
 from stock_tool.portfolio_valuation import Currency, FxQuote
+from stock_tool.application.holding_analysis import holding_fx_is_usable, validated_holding_prices
 
 
 from stock_tool.dashboard.presentation_mapper import (
     format_iso_datetime,
     format_source_state_label,
     format_status_label,
-    translate_health_category,
-    translate_health_reason,
 )
 
 
@@ -53,7 +51,18 @@ def render_portfolio_workspace(
     classification_callback: Callable[[pd.DataFrame], pd.DataFrame] | None = None,
     on_research: Callable[[str, str], None] | None = None,
 ) -> None:
-    """Render holdings management and read-only analysis without implicit I/O."""
+    """Refresh once per holding set/day, then project the same analysis to UI and AI."""
+
+    from stock_tool.application.holding_identity import load_identity_state
+    from stock_tool.runtime_paths import RuntimePaths
+
+    if not st.session_state.get("holding_identity_loaded"):
+        metadata = load_identity_state(
+            RuntimePaths.from_environment().data_dir / "holding_identity.json"
+        )
+        st.session_state.setdefault("holding_profiles", metadata.get("profiles", {}))
+        st.session_state.setdefault("holding_type_overrides", metadata.get("overrides", {}))
+        st.session_state["holding_identity_loaded"] = True
 
     st.caption("管理市場限定的持股、估值與風險證據。這不是交易建議，不會自動下單。")
     snapshot = st.session_state.get("portfolio_workspace_snapshot")
@@ -70,122 +79,243 @@ def render_portfolio_workspace(
     if not isinstance(positions, pd.DataFrame):
         positions = snapshot.positions.copy(deep=True)
 
+    # Consume navigation before the single selection widget is constructed.
+    focus_identity = _consume_portfolio_focus(st, positions)
+
+    refresh_key = (
+        positions[["symbol", "market"]].to_json() if not positions.empty else "empty",
+        datetime.now(UTC).date().isoformat(),
+    )
+    if (
+        refresh_callback is not None
+        and not positions.empty
+        and st.session_state.get("holding_refresh_key") != refresh_key
+    ):
+        # Record the attempt before I/O so failed sources cannot create a rerun loop.
+        st.session_state["holding_refresh_key"] = refresh_key
+        st.session_state["holding_force_refresh"] = False
+        _refresh_and_analyze(st, service, positions, refresh_callback, classification_callback)
+    elif (
+        refresh_callback is not None
+        and not positions.empty
+        and st.session_state.get("portfolio_workspace_analysis") is None
+    ):
+        # Editing quantity/cost needs recalculation, not another market-data request.
+        _refresh_and_analyze(st, service, positions, None, classification_callback)
+
     # 1. 持倉概況
     _render_first_screen(st, snapshot, st.session_state.get("portfolio_workspace_analysis"))
+    if st.session_state.get("holding_refresh_failed"):
+        st.error("資料更新失敗；保留前次可用資料，請查看每筆資料日期。")
 
     # 2. 分析持倉
     if refresh_callback is not None and st.button(
-        "更新市場資料", key="portfolio_workspace_refresh"
+        "更新並分析持股", key="portfolio_workspace_refresh"
     ):
-        try:
-            outcome = refresh_callback()
-        except Exception:
-            st.error("資料更新失敗；既有持股與分析未被改寫。")
-        else:
-            st.session_state.portfolio_workspace_refresh_result = outcome
-            _invalidate_analysis(st)
-            st.success("已完成使用者要求的資料更新，請重新分析以建立目前結果。")
-            _rerun(st)
-    _render_analysis_controls(st, service, positions, classification_callback)
+        st.session_state["holding_force_refresh"] = True
+        _refresh_and_analyze(st, service, positions, refresh_callback, classification_callback)
+        _rerun(st)
+    with _safe_expander(st, "進階設定與手動資料備援", expanded=False):
+        _render_analysis_controls(st, service, positions, classification_callback)
     analysis = st.session_state.get("portfolio_workspace_analysis")
     if isinstance(analysis, PortfolioWorkspaceAnalysis):
         _render_analysis(st, service, analysis, positions)
+    if not positions.empty:
+        from stock_tool.dashboard.components.holding_analysis import render_holding_analysis
+
+        render_holding_analysis(st, positions, analysis)
 
     # 3. 持股管理
     _render_position_editor(st, service, positions)
     positions = st.session_state.get("portfolio_workspace_positions", positions)
     if not isinstance(positions, pd.DataFrame):
         positions = service.load_positions()
-    focus_identity = _consume_portfolio_focus(st, positions)
     _render_position_table(st, positions, on_research=on_research, focus_identity=focus_identity)
 
 
+def _refresh_and_analyze(
+    st: Any,
+    service: PortfolioWorkspaceApplicationService,
+    positions: pd.DataFrame,
+    refresh_callback: Callable[[], object] | None,
+    classification_callback: Callable[[pd.DataFrame], pd.DataFrame] | None,
+) -> None:
+    try:
+        if refresh_callback is not None:
+            st.session_state.portfolio_workspace_refresh_result = refresh_callback()
+            st.session_state["holding_refresh_failed"] = False
+    except Exception:
+        st.session_state["holding_refresh_failed"] = True
+        st.error("資料更新失敗；保留前次可用資料，請查看每筆資料日期。")
+    if positions.empty:
+        return
+    try:
+        classifications = classification_callback(positions) if classification_callback else None
+    except Exception:
+        classifications = None
+    if classifications is not None:
+        st.session_state["portfolio_classifications"] = classifications
+    profile_rows = []
+    profiles = st.session_state.get("holding_profiles", {})
+    overrides = st.session_state.get("holding_type_overrides", {})
+    for row in positions.itertuples(index=False):
+        identity = f"{row.symbol}|{row.market}"
+        profile = profiles.get(identity, {})
+        kind = overrides.get(identity, profile.get("instrument_type"))
+        if kind == "股票" and profile.get("source"):
+            profile_rows.append(
+                {
+                    "symbol": row.symbol,
+                    "market": row.market,
+                    "sector": profile.get("sector", ""),
+                    "industry": profile.get("industry", ""),
+                    "source": profile["source"],
+                }
+            )
+    if profiles:
+        classifications = pd.DataFrame(
+            profile_rows, columns=["symbol", "market", "sector", "industry", "source"]
+        )
+        st.session_state["portfolio_classifications"] = classifications
+    st.session_state.portfolio_workspace_analysis = service.analyze(
+        positions=positions,
+        prices=validated_holding_prices(
+            positions,
+            st.session_state.get("price_data"),
+            st.session_state.get("holding_profiles", {}),
+        ),
+        base_currency=st.session_state.get("portfolio_workspace_base_currency", "TWD"),
+        fx_quote=_resolved_fx_quote(st),
+        classifications=classifications,
+        fx_applied_at=st.session_state.get("portfolio_workspace_manual_fx_applied_at"),
+    )
+
+
 def _render_first_screen(st: Any, snapshot: Any, analysis: object) -> None:
+    if snapshot.positions.empty:
+        st.info("先加入一筆持股；股價與必要匯率會自動更新，股數以「股」為單位。")
+        return
     result = analysis if isinstance(analysis, PortfolioWorkspaceAnalysis) else None
     valuation = result.valuation if result is not None else None
-    health = result.health if result is not None else None
     risk = result.risk if result is not None else None
     market_value = valuation.base_market_value if valuation is not None else None
     pnl = valuation.base_unrealized_pnl if valuation is not None else None
-    coverage = health.coverage.coverage_pct if health is not None else None
     largest = risk.position_concentration if risk is not None else None
-    top_three = risk.top_three_concentration if risk is not None else None
     st.subheader("持倉概況")
-    columns = st.columns(6)
+    columns = st.columns(2) + st.columns(2)
     columns[0].metric("持股筆數", str(len(snapshot.positions)))
     columns[1].metric("基準幣別總市值", _money(market_value, result))
-    columns[2].metric("未實現損益", _money(pnl, result))
-    columns[3].metric("資料涵蓋率", _percent(coverage))
-    columns[4].metric("最大單一持股", _percent(largest))
-    columns[5].metric("前三大集中度", _percent(top_three))
+    columns[2].metric("原幣損益換算", _money(pnl, result))
+    largest_label = "最大單一持股"
+    if valuation is not None and not valuation.positions.empty:
+        ranked = valuation.positions.dropna(subset=["weight"]).sort_values(
+            "weight", ascending=False
+        )
+        if not ranked.empty:
+            largest_label = f"最大持股：{ranked.iloc[0]['symbol']}"
+    columns[3].metric(largest_label, _percent(largest))
     if result is None:
         st.info("尚未分析持股；請點擊下方「分析持倉」以計算最新估值與風險。")
         return
-    st.caption(f"資料狀態：{format_status_label(result.status.value)}")
+    st.caption("此處呈現持股估值；財報、事件與基金成分的完整程度請看單筆分析。")
     with _safe_expander(st, "詳細技術診斷與可重現資料", expanded=False):
         st.caption(f"診斷 manifest digest：{result.manifest.digest}")
-    if result.status is PortfolioDataStatus.PARTIAL:
-        st.warning("資料尚未完整，部分總額與權重不會被計算。")
-    elif result.status is PortfolioDataStatus.STALE:
-        st.warning("資料或匯率已過期，請更新資料後重新分析。")
+    if market_value is None:
+        st.warning("部分價格或換算匯率尚不可用，因此不顯示完整組合總額；可用的原幣估值仍保留。")
 
 
 def _render_position_editor(
     st: Any, service: PortfolioWorkspaceApplicationService, positions: pd.DataFrame
 ) -> None:
     st.subheader("持股管理")
-    with st.expander("新增／更新持股", expanded=True):
-        columns = st.columns(6)
-        symbol = columns[0].text_input("股票代號", value="", key="portfolio_workspace_symbol")
-        market = columns[1].selectbox(
-            "市場", ["TWSE", "TPEX", "US", "CUSTOM"], key="portfolio_workspace_market"
-        )
-        currency = columns[2].selectbox(
-            "幣別", ["自動", "TWD", "USD"], key="portfolio_workspace_currency"
-        )
-        quantity = columns[3].number_input(
-            "數量（可零股）",
-            min_value=0.0001,
-            value=1.0,
-            step=0.0001,
-            key="portfolio_workspace_quantity",
-        )
-        average_cost = columns[4].number_input(
-            "平均成本",
-            min_value=0.0,
-            value=100.0,
-            step=0.01,
-            key="portfolio_workspace_average_cost",
-        )
-        note = columns[5].text_input(
-            "備註（不納入分析 manifest）", value="", key="portfolio_workspace_note"
-        )
-        raw_symbol = (
-            str(symbol).strip()
-            or str(st.session_state.get("portfolio_workspace_symbol") or "").strip()
-        )
-        if st.button("加入／更新持股", type="primary", key="portfolio_workspace_upsert"):
-            if not raw_symbol:
-                st.warning("請輸入股票代號。")
-            else:
-                try:
-                    updated = service.add_or_update_position(
-                        positions,
-                        symbol=raw_symbol,
-                        market=market,
-                        currency=None if currency == "自動" else currency,
-                        quantity=float(quantity),
-                        average_cost=float(average_cost),
-                        note=note,
-                    )
-                except (OSError, ValueError) as exc:
-                    st.error(f"持股儲存失敗：{exc}")
+    with st.expander("新增／更新持股", expanded=positions.empty):
+        if not positions.empty:
+            editing = st.selectbox(
+                "載入既有持股",
+                [f"{row.symbol} / {row.market}" for row in positions.itertuples(index=False)],
+                key="holding_edit_identity",
+            )
+            if st.button("填入既有股數、成本與備註", key="holding_load_editor"):
+                edit_symbol, edit_market = editing.split(" / ", 1)
+                row = positions.loc[
+                    (positions.symbol == edit_symbol) & (positions.market == edit_market)
+                ].iloc[0]
+                for key, value in (
+                    ("symbol", edit_symbol),
+                    ("market", edit_market),
+                    ("currency", row.currency),
+                    ("quantity", float(row.quantity)),
+                    ("average_cost", float(row.average_cost)),
+                    ("note", str(row.note)),
+                ):
+                    st.session_state[f"portfolio_workspace_{key}"] = value
+        with st.form("holding_position_form"):
+            columns = st.columns(3) + st.columns(3)
+            symbol = columns[0].text_input("股票代號", value="", key="portfolio_workspace_symbol")
+            market = columns[1].selectbox(
+                "市場",
+                ["自動辨識", "TWSE", "TPEX", "US", "CUSTOM"],
+                key="portfolio_workspace_market",
+            )
+            currency = columns[2].selectbox(
+                "幣別", ["自動", "TWD", "USD"], key="portfolio_workspace_currency"
+            )
+            quantity = columns[3].number_input(
+                "數量（股，可輸入零股）",
+                min_value=0.0001,
+                value=1.0,
+                step=0.0001,
+                key="portfolio_workspace_quantity",
+            )
+            average_cost = columns[4].number_input(
+                "平均成本（原幣／股）",
+                min_value=0.0,
+                value=100.0,
+                step=0.01,
+                key="portfolio_workspace_average_cost",
+            )
+            note = columns[5].text_input("備註", value="", key="portfolio_workspace_note")
+            raw_symbol = (
+                str(symbol).strip()
+                or str(st.session_state.get("portfolio_workspace_symbol") or "").strip()
+            )
+            if st.form_submit_button(
+                "加入／更新持股", type="primary", key="portfolio_workspace_upsert"
+            ):
+                if not raw_symbol:
+                    st.warning("請輸入股票代號。")
                 else:
-                    st.session_state.portfolio_workspace_positions = updated
-                    st.session_state.portfolio_workspace_snapshot = service.load_snapshot()
-                    _invalidate_analysis(st)
-                    st.success(f"已儲存 {raw_symbol.upper()} / {market}。")
-                    _rerun(st)
+                    try:
+                        if market == "自動辨識":
+                            from stock_tool.application.holding_identity import (
+                                resolve_holding_identity,
+                            )
+
+                            identity = resolve_holding_identity(raw_symbol)
+                            raw_symbol = str(identity["symbol"])
+                            market = str(identity["market"])
+                            st.session_state.setdefault("holding_profiles", {})[
+                                f"{raw_symbol}|{market}"
+                            ] = identity
+                            if currency == "自動":
+                                currency = str(identity["currency"])
+                        updated = service.add_or_update_position(
+                            positions,
+                            symbol=raw_symbol,
+                            market=market,
+                            currency=None if currency == "自動" else currency,
+                            quantity=float(quantity),
+                            average_cost=float(average_cost),
+                            note=note,
+                        )
+                    except (OSError, ValueError) as exc:
+                        st.error(f"持股儲存失敗：{exc}")
+                    else:
+                        st.session_state.portfolio_workspace_positions = updated
+                        st.session_state.portfolio_workspace_snapshot = service.load_snapshot()
+                        _invalidate_analysis(st)
+                        st.success(f"已儲存 {raw_symbol.upper()} / {market}。")
+                        _rerun(st)
 
     if not positions.empty:
         st.markdown("#### 移除指定持股")
@@ -252,12 +382,11 @@ def _render_position_table(
             f"{row.symbol} / {row.market}"
             for row in positions[["symbol", "market"]].itertuples(index=False)
         ]
-        selected = st.selectbox(
-            "研究這筆持股",
-            identities,
-            key="portfolio_workspace_research_identity",
-        )
-        if st.button("返回研究目前資料", key="portfolio_workspace_return_research"):
+        selected = st.session_state.get("portfolio_workspace_research_identity", identities[0])
+        if selected not in identities:
+            selected = identities[0]
+        st.caption(f"目前研究持股：{selected}（與上方分析共用選擇）")
+        if st.button("深入研究這筆持股", key="portfolio_workspace_return_research"):
             symbol, market = selected.split(" / ", maxsplit=1)
             on_research(symbol, market)
 
@@ -295,9 +424,7 @@ def _render_analysis_controls(
     classification_callback: Callable[[pd.DataFrame], pd.DataFrame] | None = None,
 ) -> None:
     st.subheader("分析設定")
-    base_currency = st.selectbox(
-        "基準幣別", ["TWD", "USD"], key="portfolio_workspace_base_currency"
-    )
+    st.selectbox("基準幣別", ["TWD", "USD"], key="portfolio_workspace_base_currency")
     manual_rate = st.number_input(
         "手動 USD/TWD 匯率（可選）",
         min_value=0.0,
@@ -317,35 +444,14 @@ def _render_analysis_controls(
             _invalidate_analysis(st)
             st.caption("手動匯率已套用；分析時會記錄實際 UTC applied_at。")
             st.success("已套用手動 USD/TWD 匯率；請重新分析。")
-    st.caption("持股載入、畫面 render 與分析不會自動發出網路請求。")
+    st.caption("持股首次開啟與新增標的會自動更新；手動匯率僅作資料來源失敗時的備援。")
     if st.button("分析持倉", type="primary", key="portfolio_workspace_analyze"):
         quote = _resolved_fx_quote(st)
         manual_value = st.session_state.get("portfolio_workspace_manual_fx")
         if manual_value and quote is None:
             st.error("匯率無效或已過期，無法執行跨幣別分析。")
             return
-        prices = st.session_state.get("price_data")
-        if not isinstance(prices, pd.DataFrame):
-            prices = None
-        classifications = (
-            classification_callback(positions)
-            if classification_callback is not None
-            else _frame_or_none(st.session_state.get("portfolio_classifications"))
-        )
-        if classifications is not None:
-            st.session_state["portfolio_classifications"] = classifications
-        analysis = service.analyze(
-            positions=positions,
-            prices=prices,
-            base_currency=base_currency,
-            fx_quote=quote,
-            fundamentals=_frame_or_none(st.session_state.get("fundamentals")),
-            indicators=_frame_or_none(st.session_state.get("technical_indicators")),
-            stock_scores=_frame_or_none(st.session_state.get("fundamental_scores")),
-            classifications=classifications,
-            fx_applied_at=st.session_state.get("portfolio_workspace_manual_fx_applied_at"),
-        )
-        st.session_state.portfolio_workspace_analysis = analysis
+        _refresh_and_analyze(st, service, positions, None, classification_callback)
         _rerun(st)
 
 
@@ -355,7 +461,9 @@ def _render_analysis(
     analysis: PortfolioWorkspaceAnalysis,
     positions: pd.DataFrame,
 ) -> None:
-    prices = _frame_or_none(st.session_state.get("price_data"))
+    prices = validated_holding_prices(
+        positions, st.session_state.get("price_data"), st.session_state.get("holding_profiles", {})
+    )
     quote = _resolved_fx_quote(st)
     if quote is not None:
         st.caption(
@@ -377,7 +485,7 @@ def _render_analysis(
     ):
         st.session_state.pop("portfolio_workspace_stress_result", None)
         st.warning("設定或資料已變更，保存的分析結果可能過期；請重新分析。")
-    st.subheader("估值、健康度與風險")
+    st.subheader("持股市值與集中度")
     if not analysis.valuation.positions.empty:
         val_df = analysis.valuation.positions.copy(deep=True)
         rename_map = {
@@ -392,16 +500,40 @@ def _render_analysis(
             "unrealized_pnl_pct": "未實現報酬率",
             "weight": "持股權重",
             "status": "資料狀態",
+            "native_currency": "報價幣別",
+            "latest_price": "收盤價",
+            "native_market_value": "原幣市值",
+            "native_unrealized_pnl": "原幣未實現損益",
+            "base_market_value": "換算參考市值",
         }
+        visible = [
+            "symbol",
+            "market",
+            "quantity",
+            "native_currency",
+            "latest_price",
+            "native_market_value",
+            "native_unrealized_pnl",
+            "base_market_value",
+            "weight",
+        ]
+        val_df = val_df[[column for column in visible if column in val_df.columns]]
         val_df = val_df.rename(columns={k: v for k, v in rename_map.items() if k in val_df.columns})
         if "資料狀態" in val_df.columns:
             val_df["資料狀態"] = val_df["資料狀態"].map(lambda s: format_status_label(s))
         st.dataframe(val_df, width="stretch", hide_index=True)
-    st.write(f"健康度評估狀態：{format_status_label(analysis.health.status)}")
-    for component in analysis.health.components:
-        comp_name = translate_health_category(component.name)
-        reasons = " ".join([translate_health_reason(r) for r in component.reasons])
-        st.write(f"{comp_name}：{_health_percent(component.score)}；{reasons}")
+    st.caption(
+        "換算市值採用目前匯率；原幣損益未計入歷史換匯損益。各筆資料可能來自不同交易日期，詳見單筆分析。"
+    )
+    with _safe_expander(st, "進階曝險、假設情境與診斷", expanded=False):
+        _render_risk_details(st, service, analysis)
+
+
+def _render_risk_details(
+    st: Any,
+    service: PortfolioWorkspaceApplicationService,
+    analysis: PortfolioWorkspaceAnalysis,
+) -> None:
     exp_labels = {
         "market": "市場曝險",
         "currency": "幣別曝險",
@@ -523,11 +655,12 @@ def _resolved_fx_quote(st: Any) -> FxQuote | None:
     resolution = st.session_state.get("portfolio_fx_resolution")
     quote = getattr(resolution, "quote", None)
     if isinstance(quote, FxQuote):
-        return quote if not quote.stale else None
-    return _manual_quote(
+        return quote if holding_fx_is_usable(quote) else None
+    manual = _manual_quote(
         st.session_state.get("portfolio_workspace_manual_fx"),
         st.session_state.get("portfolio_workspace_manual_fx_applied_at"),
     )
+    return manual if holding_fx_is_usable(manual) else None
 
 
 def _invalidate_analysis(st: Any) -> None:

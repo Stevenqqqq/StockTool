@@ -56,11 +56,14 @@ def render_research_workspace(
         ("總覽", "圖表", "基本面", "評分解釋", "證據與資料", "風險與情境")
     )
     with overview:
-        company, chart = st.columns((1, 1))
-        with company:
+        if snapshot.company_profile is not None and snapshot.company_profile.dossier is not None:
             _render_company_overview(st, snapshot, compact=True)
-        with chart:
-            _render_overview_chart(st, snapshot)
+        else:
+            company, chart = st.columns((1, 1))
+            with company:
+                _render_company_overview(st, snapshot, compact=True)
+            with chart:
+                _render_overview_chart(st, snapshot)
         render_risk_summary(st, snapshot)
     with chart_tab:
         _render_chart(st, snapshot)
@@ -222,6 +225,12 @@ def _render_company_overview(st: Any, snapshot: ResearchSnapshot, *, compact: bo
     st.subheader("公司介紹")
     if profile is None:
         st.info("公司資料不足。請確認代號與市場，或補充可驗證的公開公司資料。")
+        return
+    if profile.dossier is not None:
+        from stock_tool.dashboard.components.company_dossier import render_company_dossier
+
+        st.write(f"{profile.company_name}（{profile.symbol}）")
+        render_company_dossier(st, profile.dossier)
         return
     st.caption("公司名稱與產業分類標示為事實資料；業務與產業鏈內容標示為研究推論。")
     st.markdown("**事實資料**")

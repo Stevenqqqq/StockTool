@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.3 - 2026-09-27 (local personal upgrade; not publicly released)
+
+- Version the independently accepted research-workflow payload as 1.4.3; no new product features.
+- Install both the desktop and Start menu shortcuts through the stable StockTool entry.
+- Keep user data and Groq credentials outside the program directory. The current host installation and local formal release directory are 1.4.3; pre-existing user-data files remain byte-identical.
+- The user expressly waived the guest installer lifecycle for this direct host upgrade. Hash, asset and isolated-start checks passed; GUI and actual restart remain unverified. No public release or signing is claimed.
+
 ## 1.4.2 - 2026-09-03 (approved personal release)
 
 - Raised the pypdf security floor to 6.16.1 without changing product behavior,

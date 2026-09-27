@@ -248,6 +248,47 @@ def _profile_evidence(
                 fetched_at=fetched_at,
             )
         )
+    dossier = profile.dossier
+    if dossier is not None and (dossier.symbol, dossier.market) == (
+        snapshot.symbol.code,
+        snapshot.symbol.market.value,
+    ):
+        from stock_tool.company_explanation import explain_company
+
+        for index, fact in enumerate(dossier.facts[:24]):
+            rows.append(
+                EvidenceRecord(
+                    evidence_id=f"company.document.{index}",
+                    kind=ClaimKind.WARNING if dossier.state == "stale" else ClaimKind.FACT,
+                    label=f"官網揭露：{fact.section}／{fact.subject}",
+                    text=(
+                        f"{fact.stage}；內容日期：{fact.published_at or '未標示，不能確認最新'}。"
+                        f"{'更新失敗，保留舊資料。' if dossier.state == 'stale' else ''}"
+                        f"公司原文：{fact.excerpt}"
+                    ),
+                    source=fact.url,
+                    provider="公司官網",
+                    url=fact.url,
+                    symbol=dossier.symbol,
+                    market=dossier.market,
+                    available_at=fact.published_at or None,
+                    fetched_at=fact.fetched_at,
+                )
+            )
+        for index, explanation in enumerate(explain_company(dossier)):
+            rows.append(
+                EvidenceRecord(
+                    evidence_id=f"company.explanation.{index}",
+                    kind=ClaimKind.INFERENCE,
+                    label=explanation.heading,
+                    text=f"{explanation.kind}：{explanation.text}",
+                    source="本機中文研究整理；對照官網證據 "
+                    + ", ".join(f"company.document.{i}" for i in explanation.evidence_indices),
+                    provider="StockTool",
+                    symbol=dossier.symbol,
+                    market=dossier.market,
+                )
+            )
     return rows
 
 
@@ -395,6 +436,11 @@ def _snapshot_fingerprint(snapshot: ResearchSnapshot) -> str:
                     "industry": snapshot.company_profile.industry,
                     "fact_fields": snapshot.company_profile.fact_fields,
                     "sources": snapshot.company_profile.data_sources,
+                    "dossier": (
+                        snapshot.company_profile.dossier.fingerprint
+                        if snapshot.company_profile.dossier is not None
+                        else None
+                    ),
                 }
                 if snapshot.company_profile is not None
                 else None

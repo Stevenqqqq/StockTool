@@ -2,6 +2,17 @@
 
 這是一套研究、學習、風險分析與輔助判斷用途的股票分析工具。它不是投資顧問，不承諾任何收益，不自動下單，也不構成個人化投資建議。歷史資料與回測結果不代表未來報酬。
 
+## v1.4.3 個人主機更新（2026-09-27；未對外發布）
+
+本版將已由 Sol 驗收的持股與公司研究工作流程版本化為 1.4.3，不新增產品功能。
+桌面「股票分析工具」與開始功能表「StockTool」皆使用安裝目錄的固定 `StockTool.exe`，
+由 `current-version.json` 選擇已驗證的版本 payload。
+持股、研究、備份與 Groq 憑證保留於 `%LOCALAPPDATA%\StockTool`；不自動合併舊預覽資料。
+使用者已核准本次在目前主機直接升級，並明確豁免 guest 安裝生命週期。已安裝位置與
+`release\StockTool\` 本機正式目錄均為 1.4.3；原有使用者資料逐檔未變。已通過雜湊、
+資產與隔離啟動核對，但桌面畫面及實際重啟尚未驗證；不宣稱 guest lifecycle 通過，
+也不代表已在 GitHub 對外發布。詳見 `docs/product/v1.4.3-host-upgrade.md`。
+
 ## v1.4.2 個人正式發布版（2026-09-03 已核准）
 
 v1.4.2 延續已驗收的 Prediction Lab、5/20 交易日結果追蹤、官方市場日曆、
@@ -330,14 +341,17 @@ Copy-Item .env.example .env
 
 ## Windows EXE 打包與啟動
 
-### v1.4.2 Windows 建置與個人發布流程
+### Windows 建置與個人發布流程
 
 `build_exe.bat` 只會建立 `release\staging\StockTool\`，不會刪除或覆寫目前的正式
 `release\StockTool\`。完成 staging 驗證後，再執行 `publish_release.bat`；它會先建立唯一時間戳的
 `release\rollback\StockTool-pre-sprint12-release-YYYYMMDD-HHMMSS\` rollback 備份並驗證，再提升 staging 成品。
-正式 EXE 路徑為 `release\StockTool\StockTool.exe`；v1.4.2 已於 2026-09-03 核准為個人正式發布版。發布前的
+正式 EXE 路徑為 `release\StockTool\StockTool.exe`；v1.4.2 曾於 2026-09-03 核准為個人正式發布版，
+目前本機正式目錄已於 2026-09-27 同步至 v1.4.3。發布前的
 正式成品會保留在本次時間戳 rollback 目錄，promotion 過程中的舊正式版也會保留在非破壞性的
 promotion hold。若 promotion 後的資產或 EXE 雜湊檢查失敗，腳本會將舊正式版恢復。
+本次跨版本提升時，既有腳本的版本相依驗證在搬動檔案前擋下 1.4.2 舊正式目錄；
+因此本次在分別驗證舊版與新版並建立 rollback 後，以受控的本機目錄切換完成提升。
 
 正式使用者請點兩下 `release\StockTool\StockTool.exe`。工具的可變資料不在 release 資料夾：
 預設位置是 `%LOCALAPPDATA%\StockTool\`，包含 `data\cache\`、`reports\`、`logs\`、

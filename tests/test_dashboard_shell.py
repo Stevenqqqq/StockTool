@@ -29,6 +29,84 @@ from stock_tool.dashboard.state import (
 )
 
 
+@pytest.mark.parametrize("failure", [False, True])
+def test_company_refresh_replaces_ui_and_ai_snapshot_without_price_fetch(monkeypatch, failure):
+    from stock_tool.application.research_snapshot import (
+        ResearchWorkspaceService,
+        ResearchSourceMetadata,
+    )
+    from stock_tool.company_research import build_company_research_profile
+    from stock_tool.company_dossier import build_dossier
+    from stock_tool.company_documents import CompanyDocument
+    from stock_tool.research.evidence import build_evidence_bundle
+
+    doc = CompanyDocument(
+        "https://example.com",
+        "產品介紹",
+        "本公司提供DDR4記憶體與相關產品。",
+        "",
+        "2026-09-10T01:00:00+00:00",
+    )
+    profile = build_company_research_profile(
+        "MU", market="US", info={"symbol": "MU", "longName": "Micron", "industry": "Semiconductors"}
+    )
+    profile = replace(profile, dossier=build_dossier("MU", "US", doc.url, (doc,)))
+    old = ResearchWorkspaceService().build(
+        symbol=Symbol.parse("MU", market="US"),
+        price_data=None,
+        indicators=None,
+        fundamental_results=None,
+        stock_score=None,
+        company_profile=profile,
+        scenario_reference=None,
+        source_metadata=ResearchSourceMetadata(
+            provider="fixture",
+            query_symbol="MU",
+            market="US",
+            source_type="local",
+            fetched_at=None,
+            last_data_date=None,
+            row_count=0,
+        ),
+    )
+    fresh_doc = replace(doc, text="本公司提供DDR5記憶體與相關產品。")
+    new = replace(
+        old,
+        company_profile=replace(profile, dossier=build_dossier("MU", "US", doc.url, (fresh_doc,))),
+    )
+    fake = _HomeFakeStreamlit(button_result=False)
+    fake.session_state.update(
+        research_snapshot=old, dashboard_show_research_workspace=True, company_details_force=True
+    )
+    rendered = []
+    monkeypatch.setattr(
+        dashboard_shell, "_render_research_with_handoff", lambda st, snap: rendered.append(snap)
+    )
+
+    def rebuild(st, *, symbol, market):
+        assert (symbol, market) == ("MU", "US")
+        if failure:
+            raise RuntimeError("provider unavailable")
+        return new
+
+    dependencies = replace(
+        _dependencies(lambda *a, **k: pytest.fail("company refresh fetched prices")),
+        build_research_snapshot=rebuild,
+    )
+    _render_home_workspace(fake, dependencies, DashboardStatus.READY)
+    current = fake.session_state["research_snapshot"]
+    assert rendered == [current]
+    assert current.price == old.price
+    assert build_evidence_bundle(current).fingerprint != build_evidence_bundle(old).fingerprint
+    assert fake.session_state["dashboard_research_snapshots"][current.symbol.canonical] is current
+    assert not fake.session_state.get("company_details_force")
+    if failure:
+        assert current.company_profile.dossier.state == "stale"
+        assert current.warnings
+    else:
+        assert current is new
+
+
 class _FakeSessionState(dict):
     def __getattr__(self, name: str):
         return self.get(name)
@@ -136,7 +214,7 @@ def test_shell_search_can_retry_the_same_request_after_a_failure() -> None:
 
     assert calls == [("AAPL", "US"), ("AAPL", "US")]
     assert dashboard_status(fake_st.session_state) is DashboardStatus.READY
-    assert any("已切換至 AAPL" in message for message in fake_st.messages)
+    assert any("已載入 AAPL" in message for message in fake_st.messages)
 
 
 def test_shell_search_builds_one_snapshot_and_preserves_it_when_later_search_fails() -> None:
@@ -150,7 +228,7 @@ def test_shell_search_builds_one_snapshot_and_preserves_it_when_later_search_fai
         return {"symbol": symbol, "market": market, "warnings": ()}
 
     def build_snapshot(_st, *, symbol: str, market: str):
-        snapshot = {"symbol": symbol, "market": market}
+        snapshot = SimpleNamespace(symbol=Symbol.parse(symbol, market=market))
         snapshots.append(snapshot)
         return snapshot
 
@@ -169,9 +247,16 @@ def test_shell_search_builds_one_snapshot_and_preserves_it_when_later_search_fai
     _execute_pending_shell_search(fake_st, dependencies)
 
     first_snapshot = fake_st.session_state["research_snapshot"]
-    assert first_snapshot == {"symbol": "2330", "market": "TWSE"}
+    assert first_snapshot.symbol == Symbol.parse("2330", market="TWSE")
     assert snapshots == [first_snapshot]
     assert fake_st.session_state["dashboard_show_research_workspace"] is True
+    assert fake_st.rerun_count == 1
+
+    begin_search(fake_st.session_state, SearchRequest(symbol="JPM", market="US"))
+    _execute_pending_shell_search(fake_st, dependencies)
+    assert fake_st.session_state["research_snapshot"].symbol == Symbol.parse("JPM", market="US")
+    assert fake_st.rerun_count == 2
+    first_snapshot = fake_st.session_state["research_snapshot"]
 
     begin_search(fake_st.session_state, SearchRequest(symbol="MISSING", market="US"))
     _execute_pending_shell_search(fake_st, dependencies)
@@ -179,6 +264,19 @@ def test_shell_search_builds_one_snapshot_and_preserves_it_when_later_search_fai
     assert dashboard_status(fake_st.session_state) is DashboardStatus.ERROR
     assert fake_st.session_state["research_snapshot"] is first_snapshot
     assert fake_st.session_state["dashboard_show_research_workspace"] is True
+
+
+def test_shell_search_rejects_a_different_company_snapshot() -> None:
+    fake = _FakeStreamlit()
+    old = SimpleNamespace(symbol=Symbol.parse("3006", market="TWSE"))
+    fake.session_state.update(research_snapshot=old, dashboard_show_research_workspace=True)
+    begin_search(fake.session_state, SearchRequest(symbol="JPM", market="US"))
+    deps = replace(_dependencies(lambda *a, **k: {}), build_research_snapshot=lambda *a, **k: old)
+    _execute_pending_shell_search(fake, deps)
+    assert dashboard_status(fake.session_state) is DashboardStatus.ERROR
+    assert fake.session_state["dashboard_show_research_workspace"] is False
+    assert fake.rerun_count == 1
+    assert not any("已切換" in m for m in fake.messages)
 
 
 def test_explicit_research_workspace_request_can_open_retained_snapshot(monkeypatch) -> None:
@@ -519,6 +617,9 @@ def test_home_daily_evidence_action_calls_explicit_generator_once() -> None:
 def test_native_holdings_shell_uses_injected_service_and_explicit_refresh(
     monkeypatch, tmp_path: Path
 ) -> None:
+    monkeypatch.setattr(
+        "stock_tool.application.holding_identity.fetch_holding_identity", lambda *_: {}
+    )
     fake_st = _FakeStreamlit()
     calls: list[tuple[str, str, bool]] = []
 
@@ -546,7 +647,9 @@ def test_native_holdings_shell_uses_injected_service_and_explicit_refresh(
         dashboard_shell,
         "RuntimePaths",
         SimpleNamespace(
-            from_environment=lambda: SimpleNamespace(ledger_database_file=tmp_path / "ledger.db")
+            from_environment=lambda: SimpleNamespace(
+                ledger_database_file=tmp_path / "ledger.db", data_dir=tmp_path
+            )
         ),
     )
     monkeypatch.setattr(dashboard_shell, "render_page_header", lambda *_args: None)
@@ -565,9 +668,13 @@ def test_native_holdings_shell_uses_injected_service_and_explicit_refresh(
 def test_native_holdings_refresh_uses_keyword_only_contract_and_invalidates_analysis(
     monkeypatch, tmp_path: Path
 ) -> None:
+    monkeypatch.setattr(
+        "stock_tool.application.holding_identity.fetch_holding_identity", lambda *_: {}
+    )
     fake_st = _FakeStreamlit()
     fake_st.session_state.update(
         {
+            "holding_force_refresh": True,
             "portfolio_workspace_analysis": object(),
             "portfolio_workspace_stress_result": object(),
         }
@@ -600,7 +707,9 @@ def test_native_holdings_refresh_uses_keyword_only_contract_and_invalidates_anal
         dashboard_shell,
         "RuntimePaths",
         SimpleNamespace(
-            from_environment=lambda: SimpleNamespace(ledger_database_file=tmp_path / "ledger.db")
+            from_environment=lambda: SimpleNamespace(
+                ledger_database_file=tmp_path / "ledger.db", data_dir=tmp_path
+            )
         ),
     )
     monkeypatch.setattr(dashboard_shell, "render_page_header", lambda *_args: None)
@@ -614,18 +723,23 @@ def test_native_holdings_refresh_uses_keyword_only_contract_and_invalidates_anal
     assert len(calls) == 1
     assert calls[0][1] is True
     assert len(captured) == 2
-    assert "portfolio_workspace_analysis" not in fake_st.session_state
+    # The renderer replaces the analysis atomically after successful recomputation.
+    assert "portfolio_workspace_analysis" in fake_st.session_state
     assert "portfolio_workspace_stress_result" not in fake_st.session_state
 
 
 def test_native_holdings_refresh_exception_does_not_clear_existing_analysis(
     monkeypatch, tmp_path: Path
 ) -> None:
+    monkeypatch.setattr(
+        "stock_tool.application.holding_identity.fetch_holding_identity", lambda *_: {}
+    )
     fake_st = _FakeStreamlit()
     old_analysis = object()
     old_stress = object()
     fake_st.session_state.update(
         {
+            "holding_force_refresh": True,
             "portfolio_workspace_analysis": old_analysis,
             "portfolio_workspace_stress_result": old_stress,
         }
@@ -656,7 +770,9 @@ def test_native_holdings_refresh_exception_does_not_clear_existing_analysis(
         dashboard_shell,
         "RuntimePaths",
         SimpleNamespace(
-            from_environment=lambda: SimpleNamespace(ledger_database_file=tmp_path / "ledger.db")
+            from_environment=lambda: SimpleNamespace(
+                ledger_database_file=tmp_path / "ledger.db", data_dir=tmp_path
+            )
         ),
     )
     monkeypatch.setattr(dashboard_shell, "render_page_header", lambda *_args: None)
@@ -916,7 +1032,7 @@ def test_snapshot_assembly_preserves_continuation_and_handles_failure() -> None:
         ),
     )
     _execute_pending_shell_search(fake, bad_dependencies)
-    assert dashboard_status(fake.session_state) is DashboardStatus.PARTIAL
+    assert dashboard_status(fake.session_state) is DashboardStatus.ERROR
 
 
 def test_legacy_switcher_and_entry_fail_closed(monkeypatch) -> None:

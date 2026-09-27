@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from stock_tool.yfinance_runtime import configure_yfinance_cache
+
 from dataclasses import dataclass
 from datetime import date
 from time import monotonic
@@ -224,6 +226,7 @@ def _build_fundamental_row(
 
 
 def _ticker_for_symbol(query_symbol: str) -> Any:
+    configure_yfinance_cache()
     return yf.Ticker(query_symbol)
 
 

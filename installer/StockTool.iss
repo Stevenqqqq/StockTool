@@ -64,6 +64,7 @@ end;
 #if MyDisableShellIntegration == "0"
   [Icons]
   Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\StockTool.exe"; WorkingDir: "{app}"
+  Name: "{userdesktop}\股票分析工具"; Filename: "{app}\StockTool.exe"; WorkingDir: "{app}"
 
   [Run]
   Filename: "{app}\StockTool.exe"; WorkingDir: "{app}"; Description: "Launch StockTool"; Flags: nowait postinstall skipifsilent

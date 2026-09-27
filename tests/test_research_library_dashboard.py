@@ -34,6 +34,12 @@ class _FakeStreamlit:
     def write(self, value: str) -> None:
         self.events.append(value)
 
+    def text(self, value: str) -> None:
+        self.events.append(value)
+
+    def link_button(self, label: str, url: str) -> None:
+        self.events.extend((label, url))
+
     def markdown(self, value: str) -> None:
         self.events.append(value)
 
@@ -179,7 +185,7 @@ def test_actual_library_render_saved_version_is_provider_free_and_survives_rerun
     assert "頁碼引用：第 4 頁" in rendered
     assert "Latest close is 100." in rendered
     assert "引用：price" in rendered
-    assert "參考網址：https://example.invalid/price" in rendered
+    assert "核對保存的來源原文\nhttps://example.invalid/price" in rendered
 
     # Exercise the production shell path with a provider that fails on any call.
     monkeypatch.setattr(

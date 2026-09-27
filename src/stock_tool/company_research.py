@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from stock_tool.yfinance_runtime import configure_yfinance_cache
+
 from dataclasses import dataclass
 from time import monotonic
 from typing import Any, Mapping, Sequence
@@ -12,6 +14,8 @@ from stock_tool.concept_repository import legacy_unverified_concept_hints
 from stock_tool.data.auto_fetch import Market, normalize_market, yfinance_symbol_candidates
 from stock_tool.data.repositories import ConceptRelationRecord
 from stock_tool.network_deadline import RemoteCallTimeout, call_with_timeout
+from stock_tool.company_dossier import CompanyDossier, collect_dossier
+from stock_tool.runtime_paths import RuntimePaths
 
 
 @dataclass(frozen=True)
@@ -34,6 +38,9 @@ class CompanyResearchProfile:
     data_sources: tuple[str, ...]
     limitations: tuple[str, ...]
     fact_fields: tuple[str, ...] = ()
+    dossier: CompanyDossier | None = None
+    business_summary: str = ""
+    instrument_type: str = "未確認"
 
     @property
     def is_available(self) -> bool:
@@ -355,6 +362,8 @@ def build_company_research_profile(
     concept_relations: Sequence[ConceptRelationRecord] = (),
     allow_remote_fetch: bool = True,
     fetch_timeout_seconds: float = 5.0,
+    include_details: bool = False,
+    refresh_details: bool = False,
 ) -> CompanyResearchProfile:
     """Build a conservative business and industry summary for one company."""
 
@@ -477,6 +486,45 @@ def build_company_research_profile(
     if not matched_domains:
         limitations.append("未匹配到明確題材規則，技術與應用摘要會較保守。")
 
+    dossier = None
+    if include_details and allow_remote_fetch:
+        canonical_market = {"TW": "TWSE", "TWO": "TPEX"}.get(str(market), str(market))
+        expected = yfinance_symbol_candidates(symbol_text, market=market)
+        returned = str(fetched_info.get("symbol") or "").upper()
+        if (
+            returned in expected
+            and canonical_market in {"TWSE", "TPEX", "US"}
+            and str(fetched_info.get("quoteType") or "").upper() == "EQUITY"
+        ):
+            dossier = collect_dossier(
+                symbol_text,
+                canonical_market,
+                website,
+                industry=industry,
+                cache_dir=RuntimePaths.from_environment().cache_dir / "company_documents",
+                force=refresh_details,
+            )
+            # Once company documents are available, do not keep broad industry
+            # guesses under the company's principal-risk heading.
+            from stock_tool.company_explanation import explain_company
+
+            risk_explanations = tuple(
+                item
+                for item in explain_company(dossier)
+                if "風險" in item.heading and item.evidence_indices
+            )
+            bottlenecks = (
+                (
+                    "待驗證的研究風險："
+                    + risk_explanations[0].text.split("。")[0]
+                    + "。尚未證明已發生；請核對下方證據與缺口。",
+                )
+                if risk_explanations
+                else ("本次未取得足夠的公司風險原文；不能據此認定風險低。",)
+            )
+            additional_checks = dossier.questions
+            limitations = list(dossier.gaps)
+
     return CompanyResearchProfile(
         symbol=symbol_text,
         provider_symbol=provider_symbol,
@@ -493,6 +541,16 @@ def build_company_research_profile(
         additional_checks=additional_checks,
         data_sources=tuple(data_sources),
         limitations=tuple(_dedupe(*limitations)),
+        dossier=dossier,
+        business_summary=summary[:8000],
+        instrument_type=(
+            {"EQUITY": "股票", "ETF": "ETF"}.get(
+                str(fetched_info.get("quoteType") or "").upper(), "未確認"
+            )
+            if str(fetched_info.get("symbol") or "").upper()
+            in yfinance_symbol_candidates(symbol_text, market=market)
+            else "未確認"
+        ),
         fact_fields=tuple(
             field
             for field, value in (
@@ -525,6 +583,7 @@ def _fetch_company_info(
             failures.append("公司基本資料查詢逾時，已保留可用的本機研究結果。")
             break
         try:
+            configure_yfinance_cache()
             ticker = yf.Ticker(candidate)
             info = call_with_timeout(
                 lambda: (

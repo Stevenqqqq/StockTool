@@ -13,7 +13,7 @@ def test_launcher_version_flag_uses_the_package_canonical_version(monkeypatch, c
     monkeypatch.setattr(sys, "argv", ["StockTool.exe", "--version"])
 
     assert launcher.main() == 0
-    assert capsys.readouterr().out.strip() == "1.4.2"
+    assert capsys.readouterr().out.strip() == "1.4.3"
 
 
 def test_launcher_uses_8502_when_8501_is_unavailable(monkeypatch) -> None:

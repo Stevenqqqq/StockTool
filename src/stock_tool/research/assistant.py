@@ -551,7 +551,9 @@ def _fallback(bundle: EvidenceBundle, *, warnings: tuple[str, ...] = ()) -> AIRe
                 "資料不足：沒有可用證據建立今日研究摘要。",
             )
         )
-    claims = list(_with_required_next_step(tuple(claims), bundle=bundle))
+    # Reserve a slot for the next step, then derive citations from exactly the
+    # persisted claims. Rich company evidence can exceed the note's 32 slots.
+    claims = list(_with_required_next_step(tuple(claims[:31]), bundle=bundle))
     return AIResearchNote(
         schema_version=_SCHEMA_VERSION,
         symbol=bundle.symbol,

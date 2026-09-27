@@ -272,6 +272,8 @@ def test_installer_source_is_fixed_per_user_and_does_not_delete_user_data() -> N
     assert 'WorkingDir: "{app}"' in installer
     assert "#ifndef MyDisableShellIntegration" in installer
     assert '#if MyDisableShellIntegration == "0"' in installer
+    assert 'Name: "{userdesktop}\\股票分析工具"; Filename: "{app}\\StockTool.exe"' in installer
+    assert 'Name: "{autoprograms}\\{#MyAppName}"; Filename: "{app}\\StockTool.exe"' in installer
     assert 'Type: filesandordirs; Name: "{app}\\versions"' in installer
     assert 'Type: files; Name: "{app}\\current-version.json"' in installer
     assert "%LOCALAPPDATA%\\StockTool" not in installer
@@ -292,7 +294,7 @@ def test_version_resource_installer_and_manifest_use_one_canonical_version() -> 
     assert "StockTool.spec" in build
     assert "--name StockTool" not in build
     assert 'f"/DMyAppVersion={__version__}"' in installer_build
-    assert windows_version_tuple() == "1, 4, 2, 0"
+    assert windows_version_tuple() == "1, 4, 3, 0"
 
 
 def test_manifest_template_declares_all_generated_fields() -> None:

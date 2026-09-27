@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from stock_tool.yfinance_runtime import configure_yfinance_cache
+
 import json
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -262,6 +264,7 @@ class _ResolvedFxProvider:
 
 
 def _load_yfinance_history(symbol: str) -> pd.DataFrame:
+    configure_yfinance_cache()
     return yf.Ticker(symbol).history(period="5d", interval="1d", auto_adjust=False)
 
 

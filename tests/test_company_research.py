@@ -30,6 +30,8 @@ def test_company_profile_returns_promptly_when_optional_provider_blocks(monkeypa
         get_info = staticmethod(blocking_info)
 
     monkeypatch.setattr(company_research.yf, "Ticker", lambda _symbol: BlockingTicker())
+    # This provider-deadline unit test must not bind or switch a real Yahoo DB.
+    monkeypatch.setattr(company_research, "configure_yfinance_cache", lambda: None)
 
     started = monotonic()
     profile = build_company_research_profile("2330", market="TWSE", fetch_timeout_seconds=0.02)

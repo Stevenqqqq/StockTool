@@ -57,7 +57,16 @@ def render_library_workspace(
     if library is None:
         return force_refresh
 
-    st.caption("研究庫保存可驗證的研究版本；查看保存版本不會抓取目前市場資料。")
+    from stock_tool.dashboard.components.work_session import render_saved_work_sessions
+    from stock_tool.research.work_session import WorkSessionStore
+
+    render_saved_work_sessions(
+        st, WorkSessionStore(library.directory.parent / "research_work_sessions")
+    )
+
+    st.caption(
+        "以下為既有單份研究版本；上方為持股與公司工作階段。查看保存版本不會抓取目前市場資料。"
+    )
     symbol = st.text_input("代號篩選", key="library_symbol_filter")
     market = st.selectbox("市場篩選", ("", "TWSE", "TPEX", "US"), key="library_market_filter")
     title = st.text_input("標題篩選", key="library_title_filter")
@@ -69,7 +78,7 @@ def render_library_workspace(
             st.info("沒有符合篩選條件的研究版本。請清除代號、市場或標題條件。")
         else:
             st.info(
-                "研究庫目前尚無保存的研究版本。\n\n"
+                "目前尚無既有單份研究版本；不影響上方已保存的工作階段。\n\n"
                 "💡 如何保存第一份研究：\n"
                 "1. 前往「個股研究」工作區輸入欲研究之股票代號。\n"
                 "2. 檢視各項分析指標與證據。\n"
@@ -83,7 +92,7 @@ def render_library_workspace(
                 f"保存時間：{created_fmt}｜資料截至：{_display_optional_text(entry.data_as_of)}｜"
                 f"模式：{format_status_label(str(entry.note.mode))}｜覆蓋率：{_display_optional_text(entry.note.coverage)}"
             )
-            st.write("資料來源：" + ("、".join(entry.sources) or "無資料"))
+            st.text("資料來源：" + ("、".join(entry.sources) or "無資料"))
             for warning in (*entry.note.warnings, *entry.note.missing_data):
                 st.caption(f"警告／資料限制：{warning}")
             if st.button("查看保存版本", key=f"library_open_{entry.library_entry_id}"):
@@ -168,7 +177,7 @@ def _render_saved_entry(
         f"模式：{_display_optional_text(entry.note.mode)}｜信心：{_display_optional_text(entry.note.confidence_label)}｜"
         f"覆蓋率：{_display_optional_text(entry.note.coverage)}"
     )
-    st.write("資料來源：" + ("、".join(entry.sources) or "無資料"))
+    st.text("資料來源：" + ("、".join(entry.sources) or "無資料"))
 
     if entry.document_reference_integrity == "legacy_unverified":
         st.warning("警告：此舊版文件引用未受完整性保護，已安全略過。")
@@ -196,19 +205,19 @@ def _render_saved_entry(
             "unknown": "其他",
         }.get(claim.kind.value, "研究主張")
         st.markdown(f"**{kind_label}｜{claim.section}**")
-        st.write(claim.text)
+        st.text(claim.text)
         for evidence_id in claim.citation_ids:
             citation = citations.get(evidence_id)
             if citation is None:
                 st.warning(f"缺少保存的引用資料：{evidence_id}")
                 continue
-            st.caption(
+            st.text(
                 "引用："
                 f"{citation.evidence_id}｜來源：{_display_optional_text(citation.source)}｜"
                 f"提供者：{_display_optional_text(citation.provider)}｜摘錄：{_display_optional_text(citation.excerpt)}"
             )
             if citation.url:
-                st.caption(f"參考網址：{citation.url}")
+                st.link_button("核對保存的來源原文", citation.url)
     for missing in entry.note.missing_data:
         st.caption(f"資料缺口／限制：{missing}")
     for warning in entry.note.warnings:

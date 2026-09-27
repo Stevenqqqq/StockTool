@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import inspect
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -236,6 +236,42 @@ def _render_home_workspace(
     """Render the start screen and adapt one approved hydration request."""
 
     snapshot = st.session_state.research_snapshot
+    if (
+        snapshot is not None
+        and st.session_state.get("company_details_force", False)
+        and dependencies.build_research_snapshot is not None
+    ):
+        # Rebuild from the already loaded price/score inputs; only company
+        # documents are refreshed. The new snapshot is also the AI input.
+        try:
+            refreshed = dependencies.build_research_snapshot(
+                st, symbol=snapshot.symbol.code, market=snapshot.symbol.market.value
+            )
+            if refreshed is None or refreshed.symbol != snapshot.symbol:
+                raise ValueError("Company refresh changed research identity")
+            snapshot = refreshed
+            st.session_state["research_snapshot"] = snapshot
+            snapshots = dict(st.session_state.get("dashboard_research_snapshots") or {})
+            snapshots[snapshot.symbol.canonical] = snapshot
+            st.session_state["dashboard_research_snapshots"] = snapshots
+        except Exception:
+            warning = "公司資料更新未完成，仍顯示前次研究快照；請核對原文取得日期。"
+            profile = getattr(snapshot, "company_profile", None)
+            if profile is not None and profile.dossier is not None:
+                snapshot = replace(
+                    snapshot,
+                    company_profile=replace(
+                        profile, dossier=replace(profile.dossier, state="stale")
+                    ),
+                    warnings=(*snapshot.warnings, warning),
+                )
+                st.session_state["research_snapshot"] = snapshot
+                snapshots = dict(st.session_state.get("dashboard_research_snapshots") or {})
+                snapshots[snapshot.symbol.canonical] = snapshot
+                st.session_state["dashboard_research_snapshots"] = snapshots
+            st.warning(warning)
+        finally:
+            st.session_state.pop("company_details_force", None)
     if snapshot is not None and st.session_state.get("dashboard_show_research_workspace", False):
         if st.button("返回今天先看這些", key="return_to_daily_home"):
             st.session_state["dashboard_show_research_workspace"] = False
@@ -646,8 +682,36 @@ def _render_workspace(
 
         def refresh_holdings() -> tuple[object, ...]:
             positions = portfolio_service.load_positions()
+            from stock_tool.application.holding_identity import (
+                fetch_holding_identity,
+                save_identity_state,
+            )
+
+            profiles = st.session_state.setdefault("holding_profiles", {})
+            errors = st.session_state.setdefault("holding_profile_errors", {})
+            for row in positions.itertuples(index=False):
+                identity = f"{row.symbol}|{row.market}"
+                try:
+                    profiles[identity] = fetch_holding_identity(str(row.symbol), str(row.market))
+                    errors.pop(identity, None)
+                except Exception:
+                    errors[identity] = "標的名稱、類型或分類未能更新；請確認市場與代號。"
+            try:
+                save_identity_state(
+                    runtime.data_dir / "holding_identity.json",
+                    {
+                        "profiles": profiles,
+                        "overrides": st.session_state.get("holding_type_overrides", {}),
+                    },
+                )
+            except OSError:
+                st.warning("標的分類本次可用，但尚未保存；下次開啟將重新確認。")
             if dependencies.refresh_portfolio_data is not None:
-                outcome = dependencies.refresh_portfolio_data(st, positions, force_refresh=True)
+                outcome = dependencies.refresh_portfolio_data(
+                    st,
+                    positions,
+                    force_refresh=bool(st.session_state.get("holding_force_refresh", False)),
+                )
                 resolution = st.session_state.get("portfolio_fx_resolution")
                 if getattr(resolution, "status", None) == "manual":
                     quote = getattr(resolution, "quote", None)
@@ -656,7 +720,6 @@ def _render_workspace(
                         st.session_state["portfolio_workspace_manual_fx_applied_at"] = str(
                             applied_at
                         )
-                st.session_state.pop("portfolio_workspace_analysis", None)
                 st.session_state.pop("portfolio_workspace_stress_result", None)
                 return (outcome,)
             outcomes: list[object] = []
@@ -994,6 +1057,10 @@ def _execute_pending_shell_search(st: Any, dependencies: DashboardShellDependenc
                 symbol=request.symbol,
                 market=request.market,
             )
+            if snapshot is None or getattr(snapshot, "symbol", None) != Symbol(
+                request.symbol, Market(request.market)
+            ):
+                raise ValueError("Research snapshot identity does not match search")
             if snapshot is not None:
                 st.session_state["research_snapshot"] = snapshot
                 st.session_state["dashboard_show_research_workspace"] = True
@@ -1008,6 +1075,15 @@ def _execute_pending_shell_search(st: Any, dependencies: DashboardShellDependenc
                 "Research snapshot assembly failed for %s/%s", request.symbol, request.market
             )
             warnings = (*warnings, "研究快照尚未建立；已保留既有資料，不會顯示假結果。")
+            st.session_state["dashboard_show_research_workspace"] = False
+            finish_search(
+                st.session_state,
+                request,
+                status=DashboardStatus.ERROR,
+                message="新公司的研究未能確認，請重新查詢；尚未切換成功。",
+            )
+            st.rerun()
+            return
     status = DashboardStatus.PARTIAL if warnings else DashboardStatus.READY
     finish_search(
         st.session_state,
@@ -1017,7 +1093,10 @@ def _execute_pending_shell_search(st: Any, dependencies: DashboardShellDependenc
         source=str((st.session_state.price_data_source or {}).get("source_type") or ""),
         updated_at=str((st.session_state.price_data_source or {}).get("end_date") or "") or None,
     )
-    st.success(f"已切換至 {request.symbol}（{request.market}）。")
+    if dependencies.build_research_snapshot is not None:
+        st.rerun()
+        return
+    st.success(f"已載入 {request.symbol}（{request.market}）資料。")
     source = st.session_state.price_data_source or {}
     _render_daily_refresh_result(st)
     st.caption(
