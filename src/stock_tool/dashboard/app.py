@@ -8,7 +8,7 @@ import os
 import sys
 import tempfile
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -3228,6 +3228,10 @@ def _get_company_research_profile(st: Any, symbol: str) -> CompanyResearchProfil
                     "symbol": symbol,
                 },
                 concept_relations=_canonical_concept_relations(st, symbol),
+            )
+            cache[cache_key] = replace(
+                cache[cache_key],
+                retrieval_issue="公司資料處理未完成；請重新讀取公司資料，價格與評分不代表公司研究完整。",
             )
             st.warning(f"公司業務脈絡自動查詢未完成：{exc}")
         st.session_state.company_research_cache = cache

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.3 MU r2 - 2026-09-30 (approved private personal release)
+
+- Separate weighted indicator coverage from company research completeness, with explicit data gaps and retry guidance.
+- Keep the research header partial after basic or limited company-data recovery; preserve persisted snapshot contracts and scoring formulas.
+- Render full weighted-coverage labels, closing prices and dates at 1280px and 760px.
+- Independently exercised the final EXE failure/retry/recovery; 28 targeted tests passed. Full-suite implementer evidence is 1,781 passed before the final variable-only rename; no new full rerun is claimed.
+- Reuse the accepted executable bytes; internal version stays 1.4.3 and the distinct release tag is v1.4.3-mu-r2. Unsigned installer and prior guest-lifecycle exception remain explicit.
+
+
 ## 1.4.3 - 2026-09-27 (local personal upgrade; not publicly released)
 
 - Version the independently accepted research-workflow payload as 1.4.3; no new product features.

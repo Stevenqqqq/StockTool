@@ -41,6 +41,7 @@ class CompanyResearchProfile:
     dossier: CompanyDossier | None = None
     business_summary: str = ""
     instrument_type: str = "未確認"
+    retrieval_issue: str | None = None
 
     @property
     def is_available(self) -> bool:
@@ -375,12 +376,14 @@ def build_company_research_profile(
     data_sources = ["yfinance 公司基本資料"]
     limitations = list(DEFAULT_LIMITATIONS)
     fetched_info: dict[str, Any] = {}
+    retrieval_issue = None
 
     if info is not None:
         fetched_info = dict(info)
         provider_symbol = str(fetched_info.get("symbol") or symbol_text)
     elif not allow_remote_fetch:
         provider_symbol = symbol_text
+        retrieval_issue = "本次價格使用離線備援，尚未查詢公司基本資料；連線恢復後可重新讀取公司資料。"
         limitations.append("目前使用本機快取資料；為避免離線等待，已略過公司基本資料的線上查詢。")
     else:
         fetched_info, provider_symbol, fetch_error = _fetch_company_info(
@@ -388,6 +391,11 @@ def build_company_research_profile(
         )
         if fetch_error:
             limitations.append(fetch_error)
+            retrieval_issue = (
+                "公司基本資料查詢逾時；價格資料仍可用，請重新讀取公司資料。"
+                if "逾時" in fetch_error
+                else "公司資料來源未回傳可用的公司名稱、產業或業務資料；請重新讀取公司資料。"
+            )
 
     raw_name = _first_text(
         fetched_info.get("longName"),
@@ -543,6 +551,7 @@ def build_company_research_profile(
         limitations=tuple(_dedupe(*limitations)),
         dossier=dossier,
         business_summary=summary[:8000],
+        retrieval_issue=retrieval_issue,
         instrument_type=(
             {"EQUITY": "股票", "ETF": "ETF"}.get(
                 str(fetched_info.get("quoteType") or "").upper(), "未確認"

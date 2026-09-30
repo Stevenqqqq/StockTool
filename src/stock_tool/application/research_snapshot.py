@@ -208,7 +208,11 @@ class ResearchWorkspaceService:
                 MissingData(
                     field="company_profile",
                     state=MissingDataState.MISSING,
-                    reason="沒有可驗證的公司介紹資料；請確認代號、市場或補充公開公司資料。",
+                    reason=(
+                        company_profile.retrieval_issue
+                        if company_profile is not None and company_profile.retrieval_issue
+                        else "沒有可驗證的公司介紹資料；請確認代號、市場或補充公開公司資料。"
+                    ),
                 )
             )
 

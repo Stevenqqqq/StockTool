@@ -223,8 +223,18 @@ def _render_document_citation_controls(
 def _render_company_overview(st: Any, snapshot: ResearchSnapshot, *, compact: bool = False) -> None:
     profile = snapshot.company_profile
     st.subheader("公司介紹")
+    if profile is None or profile.dossier is None:
+        button = getattr(st, "button", None)
+        if callable(button) and button(
+            "重新讀取公司資料",
+            key=f"company_refresh_{snapshot.symbol.market.value}_{snapshot.symbol.code}",
+        ):
+            st.session_state["company_details_force"] = True
+            st.rerun()
+            return
     if profile is None:
-        st.info("公司資料不足。請確認代號與市場，或補充可驗證的公開公司資料。")
+        reasons = [item.reason for item in snapshot.missing_data if item.field == "company_profile"]
+        st.info("公司資料不足。" + "；".join(reasons))
         return
     if profile.dossier is not None:
         from stock_tool.dashboard.components.company_dossier import render_company_dossier
