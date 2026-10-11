@@ -50,6 +50,9 @@ class _FakeStreamlit:
     def __exit__(self, *_: object) -> None:
         return None
 
+    def expander(self, *args, **kwargs):
+        return self
+
     def title(self, value: str) -> None:
         self.events.append(("title", value))
 

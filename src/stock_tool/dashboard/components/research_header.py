@@ -14,6 +14,8 @@ from stock_tool.dashboard.presentation_mapper import (
     format_taiwan_company_display,
 )
 from stock_tool.domain.models import MissingDataState
+from stock_tool.dashboard.instrument_names import current_names, name_notice
+from stock_tool.company_explanation import explain_company
 
 
 def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
@@ -35,15 +37,34 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
         name = snapshot.company_name or known_name
     st.title(name)
 
-    status_zh = _research_status_label(snapshot)
     market_zh = format_market_label(snapshot.symbol.market.value)
-    st.caption(f"{snapshot.symbol.code} · {market_zh} · " f"研究狀態：{status_zh}")
+    st.write(f"{snapshot.symbol.code} · {market_zh}")
+    status_zh = _research_status_label(snapshot)
+    st.warning(f"研究狀態：{status_zh}")
+    notice = name_notice(snapshot.symbol.market.value, snapshot.symbol.code)
+    if notice:
+        st.caption(
+            "名稱：" + ("沿用前次確認；不代表研究已更新。" if "沿用前次" in notice else notice)
+        )
+
+    dossier = snapshot.company_profile.dossier if snapshot.company_profile else None
+    if dossier is not None and (dossier.symbol, dossier.market) != (
+        snapshot.symbol.code,
+        snapshot.symbol.market.value,
+    ):
+        dossier = None
+    explanations = explain_company(dossier) if dossier is not None else ()
+    if explanations:
+        # Use existing explanation sentences verbatim, never a new model/inference.
+        sentences = explanations[0].text.split("。")
+        business = "。".join(sentences[:2]).rstrip("。") + "。"
+        st.markdown("**這家公司做什麼**\n\n" + business)
+    else:
+        st.markdown("**這家公司做什麼**\n\n公司業務證據尚不足，不能只靠名稱或產業猜測。")
+
     price = snapshot.price
-    columns = st.columns(4)
     currency = "TWD" if snapshot.symbol.market.value in {"TWSE", "TPEX"} else "USD"
-    # ``st.metric`` truncates long labels/values in narrow columns.  Markdown
-    # keeps the value wrapped and makes the unit/meaning explicit on both wide
-    # and narrow layouts.
+    columns = st.columns(2)
     _wrapped_value(
         columns[0],
         "最新可用收盤價",
@@ -54,35 +75,88 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
         "最後資料日期",
         format_iso_datetime(price.last_data_date) if price else "資料不足",
     )
-    columns[2].metric(
-        "指標模型分數",
-        (
-            f"{snapshot.composite_score:.1f} 分"
-            if snapshot.composite_score is not None
-            else "資料不足"
-        ),
+    question = (
+        dossier.questions[0]
+        if dossier is not None and dossier.questions
+        else "先補齊可核對的公司官方文件與資料日期。"
     )
-    _wrapped_value(
-        columns[3],
-        "評分項目覆蓋率（依權重）",
-        (
-            format_percentage(snapshot.score_coverage, is_ratio=True)
-            if snapshot.score_coverage is not None
-            else "資料不足"
-        ),
+    st.markdown("**接下來先確認（待查，非已確認事實）**\n\n" + question)
+    gaps = _visible_gaps(snapshot)
+    if gaps:
+        st.warning("關鍵缺口：" + "；".join(gaps))
+
+    with st.expander("核對來源、完整限制與指標分數"):
+        directory = current_names.get()
+        if directory is not None:
+            record, _ = directory.resolve(snapshot.symbol.market.value, snapshot.symbol.code)
+            if record is not None:
+                st.write(record.full_name or record.name)
+                st.caption(
+                    f"名稱資料日期：{record.data_date}；取得：{record.fetched_at[:10]}（與行情日期分開）"
+                )
+                st.link_button("官方中文名稱來源", record.source)
+        if notice:
+            st.info(notice)
+        _render_company_data_status(st, snapshot)
+        for reason in dict.fromkeys(item.reason for item in snapshot.missing_data):
+            st.write(f"• {reason}")
+        if explanations and dossier is not None:
+            st.write(explanations[0].text)
+            for index in dict.fromkeys(explanations[0].evidence_indices):
+                st.link_button("核對業務來源", dossier.facts[index].url)
+        columns = st.columns(2)
+        columns[0].metric(
+            "指標模型分數",
+            (
+                f"{snapshot.composite_score:.1f} 分"
+                if snapshot.composite_score is not None
+                else "資料不足"
+            ),
+        )
+        _wrapped_value(
+            columns[1],
+            "評分項目覆蓋率（依權重）",
+            (
+                format_percentage(snapshot.score_coverage, is_ratio=True)
+                if snapshot.score_coverage is not None
+                else "資料不足"
+            ),
+        )
+        st.caption(
+            "指標模型只反映目前可計算的技術、基本面、估值與風險指標權重；不代表公司介紹、官方文件、財報期間的完整性或新鮮度。"
+        )
+        st.caption(
+            f"資料來源：{snapshot.source_metadata.provider or '資料不足'}；類型：{format_status_label(snapshot.source_metadata.source_type)}；實際查詢代號：{snapshot.source_metadata.query_symbol or '資料不足'}。"
+        )
+        for risk in snapshot.principal_risks:
+            st.write(f"• {risk}")
+
+
+def _visible_gaps(snapshot: ResearchSnapshot) -> tuple[str, ...]:
+    """Compress known repetitive disclosures; retain unknown gaps in full."""
+    profile = snapshot.company_profile
+    dossier = profile.dossier if profile is not None else None
+    reasons = [item.reason for item in snapshot.missing_data]
+    if dossier is not None:
+        reasons.extend(dossier.gaps)
+    labels = []
+    mappings = (
+        ("尚未取得足夠的公司揭露的風險公司證據", "公司風險原文不足"),
+        ("產品列示不代表已量產", "產品列示不等於量產、供貨或主要營收"),
+        ("尚未逐一核對最新財報分部占比及完整年報", "最新財報分部占比與完整年報未核對"),
+        ("部分頁面未提供發布／生效日期", "部分文件日期未知，不能確認最新"),
+        ("本次已達頁數或時間上限", "未讀完全部官網／文件"),
+        ("畫面與 AI 共用精選的公司證據", "僅整理精選證據"),
+        ("既有評分模型缺少此必要資料", "評分資料不足，不能形成完整總分"),
     )
-    st.caption(
-        "指標模型只反映目前可計算的技術、基本面、估值與風險指標權重；"
-        "不代表公司介紹、官方文件、財報期間的完整性或新鮮度。"
-    )
-    _render_company_data_status(st, snapshot)
-    st.caption(
-        f"資料來源：{snapshot.source_metadata.provider or '資料不足'}；"
-        f"類型：{format_status_label(snapshot.source_metadata.source_type)}；"
-        f"實際查詢代號：{snapshot.source_metadata.query_symbol or '資料不足'}。"
-    )
-    if snapshot.principal_risks:
-        st.caption(f"主要風險：{snapshot.principal_risks[-1]}")
+    for reason in reasons:
+        label = next((short for prefix, short in mappings if reason.startswith(prefix)), reason)
+        if label not in labels:
+            labels.append(label)
+    stale = _stale_reason(snapshot)
+    if stale and stale not in labels:
+        labels.insert(0, stale)
+    return tuple(labels)
 
 
 def _research_status_label(snapshot: ResearchSnapshot) -> str:
@@ -93,10 +167,7 @@ def _research_status_label(snapshot: ResearchSnapshot) -> str:
 
     # A missing price prevents the page from being a usable stock snapshot;
     # this takes precedence over company-profile messages and stale markers.
-    if (
-        snapshot.status is ResearchSnapshotStatus.INSUFFICIENT_DATA
-        or snapshot.price is None
-    ):
+    if snapshot.status is ResearchSnapshotStatus.INSUFFICIENT_DATA or snapshot.price is None:
         reason = _missing_reason(snapshot, "price_data") or "沒有可用的價格資料。"
         return f"資料不足：{reason}"
 
@@ -106,9 +177,7 @@ def _research_status_label(snapshot: ResearchSnapshot) -> str:
 
     profile = snapshot.company_profile
     if profile is None:
-        reason = (
-            _missing_reason(snapshot, "company_profile") or "沒有可驗證的公司介紹資料。"
-        )
+        reason = _missing_reason(snapshot, "company_profile") or "沒有可驗證的公司介紹資料。"
         return f"部分可用：{reason}"
 
     dossier = profile.dossier
@@ -155,10 +224,7 @@ def _first_research_gap(snapshot: ResearchSnapshot) -> str | None:
     """Return a user-facing missing-data reason excluding company identity."""
 
     for item in snapshot.missing_data:
-        if (
-            item.field != "company_profile"
-            and item.state is not MissingDataState.STALE
-        ):
+        if item.field != "company_profile" and item.state is not MissingDataState.STALE:
             return item.reason
     return None
 
@@ -185,8 +251,7 @@ def _render_company_data_status(st: Any, snapshot: ResearchSnapshot) -> None:
     dossier = profile.dossier
     if dossier is None:
         st.info(
-            "公司資料狀態：僅有基本資料，尚未取得可核對的官方公司文件；"
-            "不能視為完整公司研究。"
+            "公司資料狀態：僅有基本資料，尚未取得可核對的官方公司文件；" "不能視為完整公司研究。"
         )
         return
 
@@ -196,15 +261,14 @@ def _render_company_data_status(st: Any, snapshot: ResearchSnapshot) -> None:
     document_count = len(dossier.documents)
     fact_count = len(dossier.facts)
     if document_count:
-        st.caption(
+        st.write(
             f"公司資料狀態：已取得 {document_count} 個官方頁面，整理出 {fact_count} 項可核對內容；"
             "頁面範圍有限，不以此宣稱公司資料完整。"
         )
     else:
         st.warning(
-            "公司資料狀態：已有公司資料檔，但尚未取得可核對的官方頁面；"
-            "不能視為完整公司研究。"
+            "公司資料狀態：已有公司資料檔，但尚未取得可核對的官方頁面；" "不能視為完整公司研究。"
         )
 
     if dossier.gaps:
-        st.caption("仍缺或未完成：" + "；".join(dossier.gaps))
+        st.warning("仍缺或未完成：" + "；".join(dossier.gaps))
