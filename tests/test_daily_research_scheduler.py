@@ -117,6 +117,9 @@ def _stage_fault_market_result() -> Any:
 def _prepare_stage_fault_runner(monkeypatch, tmp_path: Path):
     """Configure a real HeadlessDailyResearchRunner with deterministic local inputs."""
 
+    # These tests replace valuation/briefs with non-domain objects. The private
+    # holdings projection has its own real-boundary tests in test_daily_holdings.
+    monkeypatch.setattr(scheduler_module, "_publish_daily_holdings", lambda *_a, **_k: None)
     paths = RuntimePaths(tmp_path / "runtime").ensure_directories()
     paths.portfolio_file.write_text(
         "symbol,market,quantity,average_cost\n2330,TWSE,1,600\n", encoding="utf-8"
@@ -943,6 +946,7 @@ def test_adapter_run_now_does_not_send_run_for_missing_task() -> None:
 
 
 def test_new_manual_date_with_same_hash_still_refreshes(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(scheduler_module, "_publish_daily_holdings", lambda *_a, **_k: None)
     paths = RuntimePaths(tmp_path / "runtime").ensure_directories()
     paths.portfolio_file.write_text(
         "symbol,market,quantity,average_cost\n2330,TWSE,1,600\n", encoding="utf-8"
@@ -983,6 +987,8 @@ def test_corrupt_immutable_brief_history_never_mints_a_new_baseline(
     tmp_path: Path, monkeypatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     """A bad history is a security event, not equivalent to no history."""
+
+    monkeypatch.setattr(scheduler_module, "_publish_daily_holdings", lambda *_a, **_k: None)
 
     paths = RuntimePaths(tmp_path / "runtime").ensure_directories()
     frame = pd.DataFrame([{"symbol": "2330", "market": "TWSE", "quantity": 1.0}])
