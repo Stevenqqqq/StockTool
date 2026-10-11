@@ -96,6 +96,40 @@ class StrategyHealthRun:
     message: str | None = None
 
 
+def _fundamental_availability_check(
+    *,
+    strategy_key: str,
+    parameters: Mapping[str, Any],
+    symbol: str,
+    price_data: pd.DataFrame,
+    fundamentals: pd.DataFrame | None,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Shared current-input check for UI preflight and actual execution."""
+    errors: list[str] = []
+    pit_warnings: tuple[str, ...] = ()
+    if strategy_key == "fundamental_growth":
+        mode = str(parameters.get("point_in_time_mode", "strict"))
+        if mode == "legacy":
+            pit_warnings = (
+                "Legacy 已明確選用：未驗證可得日期，可能有前視偏誤；結果不是嚴格歷史研究。",
+            )
+        elif fundamentals is None or fundamentals.empty:
+            errors.append("資料不足：strict 歷史研究需要具 available_date 的基本面。")
+        else:
+            selected = (
+                fundamentals.loc[fundamentals["symbol"].astype(str).eq(symbol)]
+                if "symbol" in fundamentals
+                else fundamentals.iloc[:0]
+            )
+            available = visible_fundamentals_as_of(selected, str(price_data["date"].max()))
+            pit_warnings = available.warnings
+            if available.data.empty:
+                errors.append(
+                    "資料不足：研究期間沒有具 available_date 的可用基本面；不以財報期間代替。"
+                )
+    return tuple(errors), pit_warnings
+
+
 class StrategyWorkspaceApplicationService:
     """Coordinate one isolated, deterministic strategy research workflow."""
 
@@ -179,14 +213,22 @@ class StrategyWorkspaceApplicationService:
         values: BacktestFormValues,
         price_data: pd.DataFrame | None,
         definition: StrategyDefinition,
+        fundamentals: pd.DataFrame | None = None,
     ) -> tuple[BacktestValidationResult, object]:
         """Return existing form validation plus the bounded health plan."""
 
         validation = validate_backtest_form(values)
         if price_data is not None and not price_data.empty:
+            pit_errors, pit_warnings = _fundamental_availability_check(
+                strategy_key=definition.key,
+                parameters=values.strategy_parameters,
+                symbol=values.symbol,
+                price_data=price_data,
+                fundamentals=fundamentals,
+            )
             validation = BacktestValidationResult(
-                errors=(*validation.errors, *self.integrity_errors(price_data)),
-                warnings=validation.warnings,
+                errors=(*validation.errors, *self.integrity_errors(price_data), *pit_errors),
+                warnings=(*validation.warnings, *pit_warnings),
                 next_steps=validation.next_steps,
             )
         if price_data is None or price_data.empty:
@@ -262,27 +304,14 @@ class StrategyWorkspaceApplicationService:
 
         validation = validate_backtest_form(values)
         errors = list(self.integrity_errors(price_data))
-        pit_warnings: tuple[str, ...] = ()
-        if strategy.name == "fundamental_growth":
-            mode = str(strategy.parameters.get("point_in_time_mode", "strict"))
-            if mode == "legacy":
-                pit_warnings = (
-                    "Legacy 已明確選用：未驗證可得日期，可能有前視偏誤；結果不是嚴格歷史研究。",
-                )
-            elif fundamentals is None or fundamentals.empty:
-                errors.append("資料不足：strict 歷史研究需要具 available_date 的基本面。")
-            else:
-                selected = (
-                    fundamentals.loc[fundamentals["symbol"].astype(str).eq(values.symbol)]
-                    if "symbol" in fundamentals
-                    else fundamentals.iloc[:0]
-                )
-                available = visible_fundamentals_as_of(selected, str(price_data["date"].max()))
-                pit_warnings = available.warnings
-                if available.data.empty:
-                    errors.append(
-                        "資料不足：研究期間沒有具 available_date 的可用基本面；不以財報期間代替。"
-                    )
+        pit_errors, pit_warnings = _fundamental_availability_check(
+            strategy_key=strategy.name,
+            parameters=strategy.parameters,
+            symbol=values.symbol,
+            price_data=price_data,
+            fundamentals=fundamentals,
+        )
+        errors.extend(pit_errors)
         validation = BacktestValidationResult(
             errors=(*validation.errors, *errors),
             warnings=(*validation.warnings, *pit_warnings),

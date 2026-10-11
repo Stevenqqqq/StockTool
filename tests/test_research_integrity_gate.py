@@ -168,3 +168,53 @@ render_strategy_workspace(st, service=StrategyWorkspaceApplicationService())
     for label in ("執行標準回測", "執行完整策略健檢"):
         assert next(item for item in app.button if item.label == label).disabled
     assert not any(item.value == "標準回測結果" for item in app.subheader)
+
+
+@pytest.mark.parametrize("unavailable", ["missing", "invalid", "future"])
+def test_strict_success_then_unavailable_fundamentals_hides_old_result(
+    monkeypatch, tmp_path, unavailable
+):
+    from streamlit.testing.v1 import AppTest
+
+    monkeypatch.setenv("STOCK_TOOL_USER_DATA_DIR", str(tmp_path))
+    script = """
+import pandas as pd
+import streamlit as st
+from stock_tool.application.strategy_workspace import StrategyWorkspaceApplicationService
+from stock_tool.dashboard.pages.strategy_workspace import render_strategy_workspace
+bad = st.checkbox("切換為不可用基本面", key="fixture_unavailable")
+close = [100.0 + i * .1 for i in range(100)]
+st.session_state.price_data = pd.DataFrame(dict(date=pd.date_range('2024-01-01', periods=100), symbol='2330', market='TWSE', open=close, high=close, low=close, close=close, volume=1000))
+st.session_state.price_data_source = {'source_type':'synthetic'}
+fund = pd.DataFrame([dict(symbol='2330', date='2023-12-31', available_date='2024-01-01', eps_growth=.3, revenue_growth=.3, roe=.3, debt_ratio=.2)])
+if bad:
+    if CASE == 'missing': fund = fund.drop(columns=['available_date'])
+    elif CASE == 'invalid': fund['available_date'] = 'not-a-date'
+    else: fund['available_date'] = '2025-01-01'
+st.session_state.fundamentals = fund
+render_strategy_workspace(st, service=StrategyWorkspaceApplicationService())
+""".replace("CASE", repr(unavailable))
+    app = AppTest.from_string(script).run(timeout=30)
+    app.selectbox(key="strategy_workspace_strategy").set_value("fundamental_growth").run()
+    next(b for b in app.button if b.label == "執行標準回測").click().run(timeout=30)
+    assert not app.exception
+    assert any(h.value == "標準回測結果" for h in app.subheader)
+    assert any(m.label == "總報酬" for m in app.metric)
+    previous = app.session_state["strategy_workspace_run"].manifest.digest
+
+    app.checkbox(key="fixture_unavailable").check().run(timeout=30)
+    assert not app.exception
+    assert any("available_date" in e.value for e in app.error)
+    assert any("不展示先前回測" in w.value for w in app.warning)
+    assert not any(h.value == "標準回測結果" for h in app.subheader)
+    assert not any(m.label == "總報酬" for m in app.metric)
+    for label in ("執行標準回測", "執行完整策略健檢"):
+        assert next(b for b in app.button if b.label == label).disabled
+    assert app.session_state["strategy_workspace_run"].manifest.digest == previous
+
+    # Restoring exactly the verified input permits a fresh run without changing formulas.
+    app.checkbox(key="fixture_unavailable").uncheck().run(timeout=30)
+    assert not next(b for b in app.button if b.label == "執行標準回測").disabled
+    next(b for b in app.button if b.label == "執行標準回測").click().run(timeout=30)
+    assert not app.exception
+    assert any(m.label == "總報酬" for m in app.metric)

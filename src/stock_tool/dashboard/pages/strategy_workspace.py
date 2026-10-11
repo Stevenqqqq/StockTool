@@ -123,7 +123,10 @@ def render_strategy_workspace(
         market_costs_confirmed=costs["market_costs_confirmed"],
     )
     validation, health_plan = service.preflight(
-        values=values, price_data=stock_data, definition=definition
+        values=values,
+        price_data=stock_data,
+        definition=definition,
+        fundamentals=_optional_frame(st.session_state.get("fundamentals")),
     )
     _render_preflight(st, validation, health_plan, data)
 
