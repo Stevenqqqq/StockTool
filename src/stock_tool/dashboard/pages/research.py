@@ -25,6 +25,7 @@ from stock_tool.research.assistant import AIResearchAssistant, ResearchAssistant
 from stock_tool.research.evidence import build_evidence_bundle
 from stock_tool.research.library import ResearchLibrary, ResearchLibraryError
 from stock_tool.runtime_paths import default_runtime_paths
+from stock_tool.dashboard.presentation_mapper import format_taiwan_company_display
 
 SCENARIO_REFERENCE_HEADING = "情境參考區間"
 
@@ -239,12 +240,21 @@ def _render_company_overview(st: Any, snapshot: ResearchSnapshot, *, compact: bo
     if profile.dossier is not None:
         from stock_tool.dashboard.components.company_dossier import render_company_dossier
 
-        st.write(f"{profile.company_name}（{profile.symbol}）")
+        st.write(
+            format_taiwan_company_display(
+                profile.symbol, profile.company_name, snapshot.symbol.market.value
+            )
+        )
         render_company_dossier(st, profile.dossier)
         return
     st.caption("公司名稱與產業分類標示為事實資料；業務與產業鏈內容標示為研究推論。")
     st.markdown("**事實資料**")
-    st.write(f"公司名稱：{profile.company_name}")
+    st.write(
+        "公司名稱："
+        + format_taiwan_company_display(
+            profile.symbol, profile.company_name, snapshot.symbol.market.value
+        )
+    )
     industry_str = (
         f"{profile.industry}／{profile.sector}"
         if profile.sector and profile.sector != profile.industry

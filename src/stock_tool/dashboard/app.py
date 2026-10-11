@@ -315,6 +315,9 @@ def main() -> None:
     st.set_page_config(page_title=APP_TITLE, layout="wide")
     _init_state(st)
     apply_dashboard_styles(st)
+    from stock_tool.dashboard.instrument_names import bind_names
+
+    poll_names = bind_names(st, RuntimePaths.from_environment())
 
     dependencies = DashboardShellDependencies(
         ensure_symbol_data=_ensure_symbol_data,
@@ -327,6 +330,7 @@ def main() -> None:
         build_research_snapshot=_build_research_snapshot,
         build_daily_brief=_build_daily_brief,
         build_daily_research_loop=_build_daily_research_loop,
+        render_daily_holdings=_render_daily_holdings,
         refresh_daily_data=_refresh_daily_data,
         run_daily_research=lambda: _run_daily_research(st),
         build_daily_research_run=lambda: DailyResearchRunner(
@@ -353,8 +357,10 @@ def main() -> None:
     )
     if st.session_state.legacy_dashboard:
         render_legacy_dashboard(st, dependencies)
+        poll_names()
         return
     render_dashboard_shell(st, dependencies)
+    poll_names()
 
 
 def _streamlit() -> Any:
@@ -2392,6 +2398,12 @@ def _build_daily_research_loop(st: Any) -> DailyResearchLoopResult:
     if isinstance(existing, DailyResearchLoopResult):
         return existing
     return DailyResearchLoopService().restore(_daily_research_snapshot_store().load())
+
+
+def _render_daily_holdings(st: Any) -> Any:
+    from stock_tool.dashboard.components.daily_holdings import render_daily_holdings
+
+    return render_daily_holdings(st, _runtime_paths())
 
 
 def _run_daily_research(st: Any) -> Any:

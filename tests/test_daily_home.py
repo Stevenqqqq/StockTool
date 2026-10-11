@@ -408,11 +408,17 @@ def test_returning_daily_home_uses_cards_not_raw_frames(tmp_path, monkeypatch) -
     )
     monkeypatch.setenv("STOCK_TOOL_USER_DATA_DIR", str(runtime))
 
+    from stock_tool.dashboard.components import daily_holdings as holdings_ui
+    from stock_tool.application.daily_holdings_job import DailyJob
+    monkeypatch.setattr(holdings_ui, "start_refresh", lambda *_a, **_k: DailyJob())
     app = AppTest.from_file(str(_app_path())).run(timeout=20)
 
     assert not app.exception
     headings = {heading.value for heading in app.subheader}
-    assert {"今日關注", "持倉快照", "自選股動態", "繼續研究", "待處理事項"}.issubset(headings)
+    assert "今天的持股重點" in headings
+    assert "今日關注" not in headings
+    assert any(button.label == "查看持股與完整風險" for button in app.button)
+    assert not any("00935 基本面資料不足" in heading for heading in headings)
     assert not app.dataframe
 
 

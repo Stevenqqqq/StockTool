@@ -374,15 +374,13 @@ def format_taiwan_company_display(
     """Format Taiwan stock display prioritizing Traditional Chinese company name over English provider names."""
     clean_symbol = str(symbol).strip().upper()
     clean_name = str(company_name or "").strip()
-    if (
-        not clean_name
-        or clean_name == clean_symbol
-        or clean_name.lower() == "none"
-        or _is_english_or_provider_name(clean_name)
-    ):
-        known_name = KNOWN_TAIWAN_COMPANIES.get(clean_symbol)
-        if known_name:
-            return f"{known_name} ({clean_symbol})"
+    from stock_tool.dashboard.instrument_names import current_names
+
+    directory = current_names.get()
+    if directory is not None:
+        confirmed, _ = directory.resolve(market, clean_symbol)
+        if confirmed is not None:
+            return f"{confirmed.name} ({clean_symbol})"
 
     if clean_name and clean_name != clean_symbol:
         if f"({clean_symbol})" not in clean_name:

@@ -74,6 +74,7 @@ class HomeContext:
     updated_at: str | None
     summary_warnings: tuple[str, ...] = ()
     daily_brief: DailyBrief | None = None
+    holdings_daily_available: bool = False
     daily_research_loop: DailyResearchLoopResult | None = None
     research_assistant_brief: DailyResearchAssistantBrief | None = None
     research_assistant_available: bool = False
@@ -245,6 +246,9 @@ def _safe_expander(st: Any, label: str, expanded: bool = False) -> Any:
 
 def render_home(st: Any, context: HomeContext) -> HomeAction | None:
     """Render the daily research entry point in a clean 3-tier hierarchy."""
+
+    if context.holdings_daily_available:
+        return _render_holdings_continuation(st, context)
 
     brief = context.daily_brief
     _render_home_overview_header(st, context, brief)
@@ -429,6 +433,51 @@ def render_home(st: Any, context: HomeContext) -> HomeAction | None:
         st.info(warning)
 
     st.warning("本工具僅供研究、學習與風險分析；不構成個人化投資建議。")
+    return None
+
+
+def _render_holdings_continuation(st: Any, context: HomeContext) -> HomeAction | None:
+    """Keep the holdings projection primary; retain other tools as optional detail."""
+    preparation = render_global_search(
+        st,
+        key_prefix="home",
+        disabled=context.status is DashboardStatus.LOADING,
+        default_symbol=context.active_symbol or "",
+        submit_label="研究一家公司",
+    )
+    if preparation is not None:
+        return HomeAction(kind="search", preparation=preparation)
+    if st.button("查看持股與完整風險", key="daily_holdings_full_risk"):
+        return HomeAction(kind="workspace", workspace="holdings", legacy_page="投資組合管理")
+    with _safe_expander(st, "進階研究工具與執行歷史"):
+        st.caption(f"持股筆數：{context.portfolio_count}｜自選股：{context.watchlist_count}")
+        if st.button("查看自選股", key="daily_holdings_watchlist"):
+            return HomeAction(kind="workspace", workspace="explore", legacy_page="自選股清單")
+        action = _render_macro_background(
+            st,
+            context.macro_snapshot,
+            context.macro_signals,
+            context.macro_links,
+            context.macro_revisions,
+        )
+        if action is not None:
+            return action
+        action = _render_prediction_lab(
+            st,
+            context.prediction_lab,
+            evaluate_available=context.prediction_lab_evaluation_available,
+        )
+        if action is not None:
+            return action
+        _render_daily_research_run(st, context.daily_research_run)
+        _render_daily_research_inbox(
+            st, context.daily_research_inbox, context.daily_research_inbox_brief
+        )
+        action = _render_daily_evidence_brief(
+            st, context.daily_evidence_brief, available=context.daily_evidence_available
+        )
+        if action is not None:
+            return action
     return None
 
 

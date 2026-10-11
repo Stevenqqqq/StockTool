@@ -719,11 +719,16 @@ def test_daily_research_loop_home_is_visible_after_isolated_app_restart(
     monkeypatch.setenv("STOCK_TOOL_USER_DATA_DIR", str(runtime))
     app_path = Path(__file__).parents[1] / "src" / "stock_tool" / "dashboard" / "app.py"
 
+    from stock_tool.dashboard.components import daily_holdings as holdings_ui
+    from stock_tool.application.daily_holdings_job import DailyJob
+    monkeypatch.setattr(holdings_ui, "start_refresh", lambda *_a, **_k: DailyJob())
+    before = paths.daily_research_snapshot_file.read_bytes()
+
     app = AppTest.from_file(str(app_path)).run(timeout=20)
 
     assert not app.exception
-    assert any(item.value == "每日研究更新" for item in app.subheader)
-    assert any("上次成功檢查" in item.value for item in app.caption)
+    assert any(item.value == "今天的持股重點" for item in app.subheader)
+    assert paths.daily_research_snapshot_file.read_bytes() == before
 
 
 def test_deterministic_five_session_replay_orders_only_top_three_changes() -> None:
