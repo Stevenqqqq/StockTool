@@ -301,6 +301,8 @@ async def _run_real_browser_e2e(tmp_path: Path, monkeypatch):
     env = dict(os.environ)
     env["STOCK_TOOL_USER_DATA_DIR"] = str(runtime_dir)
     env["PYTHONIOENCODING"] = "utf-8"
+    # pytest's pythonpath applies only to this process, not its Streamlit child.
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1] / "src")
 
     # Start Streamlit server
     server_stdout = server_stdout_path.open("wb")

@@ -17,8 +17,30 @@ from typing import Any, BinaryIO, Mapping, Sequence, cast
 import pandas as pd
 
 SRC_ROOT = Path(__file__).resolve().parents[2]
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
+if not getattr(sys, "frozen", False):
+    # Editable installs may append src *after* an older site-packages copy.
+    sys.path[:] = [str(SRC_ROOT), *[p for p in sys.path if Path(p).resolve() != SRC_ROOT]]
+    for _module_name, _module in tuple(sys.modules.items()):
+        if _module_name == "stock_tool" or _module_name.startswith("stock_tool."):
+            _origin = getattr(_module, "__file__", None)
+            if (
+                _origin is None
+                or not Path(_origin).resolve().is_relative_to(SRC_ROOT / "stock_tool")
+                or any(
+                    not Path(p).resolve().is_relative_to(SRC_ROOT / "stock_tool")
+                    for p in getattr(_module, "__path__", ())
+                )
+            ):
+                raise RuntimeError(
+                    "StockTool source import conflict: an already loaded module does not "
+                    "belong to this source tree. Restart with the current src first in "
+                    f"PYTHONPATH. Conflicting module: {_module_name}"
+                )
+
+    import stock_tool as _source_package
+
+    if Path(_source_package.__file__).resolve() != SRC_ROOT / "stock_tool" / "__init__.py":
+        raise RuntimeError("StockTool source import conflict: unexpected package origin.")
 
 from stock_tool.backtest import BacktestEngine, BacktestResult
 from stock_tool.application.daily_brief import (
