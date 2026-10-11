@@ -4482,6 +4482,8 @@ def _strategy_controls(st: Any, *, strategy_key: str, target_percent: float) -> 
 
 
 def _display_metrics(st: Any, result: BacktestResult) -> None:
+    from stock_tool.reports.models import format_trade_win_rate
+
     metrics = result.metrics
     _display_metric_cards(
         st,
@@ -4497,7 +4499,7 @@ def _display_metrics(st: Any, result: BacktestResult) -> None:
             {"指標": "年化波動率", "數值": _percent(metrics.annualized_volatility)},
             {"指標": "夏普比率", "數值": _number(metrics.sharpe_ratio)},
             {"指標": "Sortino 比率", "數值": _number(metrics.sortino_ratio)},
-            {"指標": "勝率", "數值": _percent(metrics.win_rate)},
+            {"指標": "勝率", "數值": format_trade_win_rate(metrics)},
             {"指標": "盈虧比", "數值": _number(metrics.profit_factor)},
             {"指標": "曝險比例", "數值": _percent(metrics.exposure)},
         ]
