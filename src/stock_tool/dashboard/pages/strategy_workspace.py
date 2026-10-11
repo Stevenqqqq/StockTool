@@ -28,6 +28,7 @@ from stock_tool.dashboard.presentation_mapper import (
 )
 from stock_tool.dashboard.state import navigate_to_workspace
 from stock_tool.domain.models import Market, Symbol
+from stock_tool.runtime_paths import RuntimePaths
 from stock_tool.strategies.registry import (
     StrategyDefinition,
     create_strategy,
@@ -62,7 +63,12 @@ def render_strategy_workspace(
     """Render a complete native strategy workflow without fetching new data."""
 
     st.subheader("策略研究工作區")
+    # Reuse the existing corporate-action CSV contract; never silently ignore it.
+    service.corporate_actions_path = RuntimePaths.from_environment().corporate_actions_file
     st.caption("僅供研究驗證；不提供策略推薦、買賣建議或未來報酬預測。")
+    st.caption(
+        "原始價格：跨日開盤或收盤跳變達 25% 即停止；已知公司行動亦須先驗證訊號調整。不代表較小跳變或事件覆蓋已完整。"
+    )
     prices = st.session_state.get("price_data")
     if not isinstance(prices, pd.DataFrame) or prices.empty:
         st.info("尚未載入可用價格資料。請先到研究首頁載入標的，再回到策略工作區。")
@@ -183,6 +189,9 @@ def render_strategy_workspace(
                 )
             st.rerun()
 
+    if not validation.can_execute:
+        st.warning("完整性檢查未通過，不展示先前回測為目前有效結果。")
+        return
     run = st.session_state.get("strategy_workspace_run")
     if run is not None and hasattr(run, "manifest"):
         _render_run(st, run, current_manifest, service)
@@ -303,6 +312,17 @@ def _render_strategy_parameters(
         )
     )
     parameters["target_percent"] = allocation / 100.0
+    if definition.requires_fundamentals:
+        legacy = st.checkbox(
+            "明確使用 Legacy 基本面日期（可能有前視偏誤）",
+            value=False,
+            key="strategy_workspace_legacy_pit",
+        )
+        parameters["point_in_time_mode"] = "legacy" if legacy else "strict"
+        if legacy:
+            st.warning("Legacy 僅供舊結果比對：財報期間不等於市場可得日期，不能視為可信歷史績效。")
+        else:
+            st.caption("Strict：只使用 available_date 已到達決策日的基本面；缺日期的資料不採用。")
     try:
         strategy = create_strategy(definition.key, parameters)
     except ValueError:
@@ -433,6 +453,8 @@ def _render_run(
 ) -> None:
     if run.status == "blocked":
         st.warning("標準回測未執行；請先修正資料或設定。")
+        for reason in run.validation.errors:
+            st.warning(reason)
         return
     if run.status == "error":
         st.error(run.health_message or "策略執行失敗。")

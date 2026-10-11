@@ -38,11 +38,19 @@ class FundamentalGrowthStrategy(StrategyBase):
         "revenue_growth_col": "revenue_growth",
         "roe_col": "roe",
         "debt_ratio_col": "debt_ratio",
-        "point_in_time_mode": FundamentalPointInTimeMode.LEGACY.value,
+        "point_in_time_mode": FundamentalPointInTimeMode.STRICT.value,
     }
 
     def validate_parameters(self) -> None:
         self._validate_sizing_parameters()
+        FundamentalPointInTimeMode(self.parameters["point_in_time_mode"])
+        if (
+            self.parameters["point_in_time_mode"] == "strict"
+            and self.parameters["date_col"] != "date"
+        ):
+            raise StrategyParameterError(
+                "Strict mode does not allow overriding the availability join column."
+            )
         if float(self.parameters["roe_min"]) < 0:
             raise StrategyParameterError("roe_min 不可為負數。")
         if float(self.parameters["debt_ratio_max"]) < 0:
@@ -55,9 +63,8 @@ class FundamentalGrowthStrategy(StrategyBase):
     ) -> pd.DataFrame:
         """Generate signals from point-in-time fundamental data.
 
-        The fundamental ``date`` column is interpreted as the data availability
-        date. Values are merged backward with price dates, so future reports are
-        not used for earlier price rows.
+        Strict mode joins only verified ``available_date`` backward to prices.
+        Fiscal/report dates are never substituted for market availability.
         """
 
         if fundamentals is None:
@@ -87,7 +94,9 @@ class FundamentalGrowthStrategy(StrategyBase):
         signal = pd.Series(0, index=features.index)
         signal.loc[buy] = 1
         signal.loc[sell] = -1
-        return finalize_signals(features, signal, strategy=self)
+        result = finalize_signals(features, signal, strategy=self)
+        result.attrs["fundamental_warnings"] = available.warnings
+        return result
 
     def _merge_fundamentals(
         self,

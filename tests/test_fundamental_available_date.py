@@ -145,7 +145,7 @@ def test_legacy_csv_preserves_date_when_loader_adds_empty_available_date(tmp_pat
 
     loaded = load_fundamentals_csv(source)
     prepared = prepare_fundamental_strategy_frame(loaded, mode="legacy")
-    signals = FundamentalGrowthStrategy(quantity=1).generate_signals(
+    signals = FundamentalGrowthStrategy(quantity=1, point_in_time_mode="legacy").generate_signals(
         pd.DataFrame({"date": ["2025-02-10"], "symbol": ["2330"], "close": [10.0]}),
         fundamentals=loaded,
     )

@@ -27,7 +27,7 @@ def visible_fundamentals_as_of(
     fundamentals: pd.DataFrame,
     decision_date: str,
     *,
-    mode: FundamentalPointInTimeMode | str = FundamentalPointInTimeMode.LEGACY,
+    mode: FundamentalPointInTimeMode | str = FundamentalPointInTimeMode.STRICT,
 ) -> FundamentalAvailabilityResult:
     """Return rows visible by ``available_date`` on a historical decision date."""
 
@@ -35,8 +35,10 @@ def visible_fundamentals_as_of(
     frame = fundamentals.copy(deep=True)
     if resolved_mode is FundamentalPointInTimeMode.STRICT:
         if "available_date" not in frame.columns:
+            empty = frame.iloc[0:0].copy()
+            empty["date"] = pd.Series(dtype="datetime64[ns]")
             return FundamentalAvailabilityResult(
-                frame.iloc[0:0].copy(),
+                empty,
                 ("Strict point-in-time mode requires available_date; no fundamentals were used.",),
             )
         availability = pd.to_datetime(frame["available_date"], errors="coerce").astype(
@@ -94,7 +96,7 @@ def visible_fundamentals_as_of(
 def prepare_fundamental_strategy_frame(
     fundamentals: pd.DataFrame,
     *,
-    mode: FundamentalPointInTimeMode | str = FundamentalPointInTimeMode.LEGACY,
+    mode: FundamentalPointInTimeMode | str = FundamentalPointInTimeMode.STRICT,
 ) -> FundamentalAvailabilityResult:
     """Prepare non-mutating fundamental rows for backward-asof strategy joins."""
 

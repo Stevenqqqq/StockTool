@@ -393,7 +393,9 @@ def test_strategy_workspace_render_run_branches() -> None:
 
     # Test blocked run
     st = FakeSt()
-    blocked_run = SimpleNamespace(status="blocked")
+    blocked_run = SimpleNamespace(
+        status="blocked", validation=SimpleNamespace(errors=("fixture blocked",))
+    )
     _render_run(st, blocked_run, None, service)
     assert any("標準回測未執行" in w for w in st.warnings)
 
