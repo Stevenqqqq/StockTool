@@ -9,6 +9,11 @@ from typing import Sequence
 import pandas as pd
 
 from stock_tool.backtest.orders import Trade
+from stock_tool.backtest.trade_evidence import (
+    RoundTrip,
+    completed_round_trips,
+    round_trip_statistics,
+)
 from stock_tool.data.corporate_actions import PricePolicy, ReturnBasis
 
 
@@ -25,7 +30,7 @@ class PerformanceMetrics:
     win_rate: float
     profit_factor: float | None
     average_holding_period: float | None
-    number_of_trades: int
+    number_of_trades: int  # Backward-compatible alias: executed fills, not round trips.
     exposure: float
     benchmark_total_return: float | None = None
     benchmark_max_drawdown: float | None = None
@@ -34,6 +39,24 @@ class PerformanceMetrics:
     benchmark_aligned_end_date: str | None = None
     benchmark_observations: int = 0
     benchmark_missing_reason: str | None = None
+    closed_round_trip_count: int | None = None
+    average_win: float | None = None
+    average_loss: float | None = None
+    payoff_ratio: float | None = None
+    expectancy: float | None = None
+    median_trade_return: float | None = None
+    average_mfe: float | None = None
+    median_mfe: float | None = None
+    average_mae: float | None = None
+    median_mae: float | None = None
+    excursion_count: int = 0
+    round_trips: tuple[RoundTrip, ...] = ()
+    trade_evidence_unavailable_reason: str | None = None
+
+    @property
+    def fill_count(self) -> int:
+        """Every executed buy/sell fill, including still-open positions."""
+        return self.number_of_trades
 
     @classmethod
     def calculate(
@@ -45,6 +68,9 @@ class PerformanceMetrics:
         benchmark: pd.DataFrame | None = None,
         risk_free_rate: float = 0.0,
         trading_days: int = 252,
+        price_data: pd.DataFrame | None = None,
+        execution_price_col: str | None = None,
+        has_corporate_actions: bool = False,
         strategy_return_basis: ReturnBasis | str | None = None,
         benchmark_return_basis: ReturnBasis | str | None = None,
         benchmark_price_policy: PricePolicy | str | None = None,
@@ -60,6 +86,19 @@ class PerformanceMetrics:
             raise ValueError("initial_cash must be positive.")
         if trading_days <= 0:
             raise ValueError("trading_days must be positive.")
+        trips, unavailable = completed_round_trips(
+            trades,
+            prices=price_data,
+            execution_price_col=execution_price_col,
+            has_corporate_actions=has_corporate_actions,
+        )
+        evidence = round_trip_statistics(trips)
+        win_rate = evidence.pop("win_rate")
+        profit_factor = evidence.pop("profit_factor")
+        average_holding_period = evidence.pop("average_holding_period")
+        if unavailable:
+            evidence["closed_round_trip_count"] = None
+        evidence.update(round_trips=trips, trade_evidence_unavailable_reason=unavailable)
         if equity_curve.empty:
             return cls(
                 total_return=0.0,
@@ -68,11 +107,12 @@ class PerformanceMetrics:
                 sharpe_ratio=None,
                 sortino_ratio=None,
                 max_drawdown=0.0,
-                win_rate=0.0,
-                profit_factor=None,
-                average_holding_period=None,
+                win_rate=win_rate,
+                profit_factor=profit_factor,
+                average_holding_period=average_holding_period,
                 number_of_trades=len(trades),
                 exposure=0.0,
+                **evidence,
             )
 
         curve = equity_curve.copy()
@@ -102,7 +142,6 @@ class PerformanceMetrics:
             trading_days=trading_days,
         )
         max_drawdown = _calculate_max_drawdown(equity)
-        win_rate, profit_factor, average_holding_period = _trade_metrics(trades)
         exposure = (
             float(
                 (
@@ -141,6 +180,7 @@ class PerformanceMetrics:
             benchmark_aligned_end_date=comparison.aligned_end_date,
             benchmark_observations=comparison.observations,
             benchmark_missing_reason=comparison.missing_reason,
+            **evidence,
         )
 
 

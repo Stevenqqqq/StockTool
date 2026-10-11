@@ -4424,7 +4424,7 @@ def _display_backtest_interpretation(
             ("CAGR", _percent(metrics.cagr)),
             ("最大回撤", _percent(metrics.max_drawdown)),
             ("Sharpe Ratio", _number(metrics.sharpe_ratio)),
-            ("交易次數", metrics.number_of_trades),
+            ("成交筆數（fills）", metrics.number_of_trades),
         ],
     )
     st.caption(
@@ -4489,7 +4489,7 @@ def _display_metrics(st: Any, result: BacktestResult) -> None:
             ("總報酬率", _percent(metrics.total_return)),
             ("年化報酬率", _percent(metrics.cagr)),
             ("最大回撤", _percent(metrics.max_drawdown)),
-            ("交易次數", metrics.number_of_trades),
+            ("成交筆數（fills）", metrics.number_of_trades),
         ],
     )
     detail = pd.DataFrame(

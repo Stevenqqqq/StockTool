@@ -480,7 +480,7 @@ def metrics_to_frame(metrics: PerformanceMetrics) -> pd.DataFrame:
         ("勝率", format_percent(metrics.win_rate)),
         ("盈虧比", format_number(metrics.profit_factor)),
         ("平均持有天數", format_number(metrics.average_holding_period)),
-        ("交易次數", str(metrics.number_of_trades)),
+        ("成交筆數（fills）", str(metrics.number_of_trades)),
         ("曝險比例", format_percent(metrics.exposure)),
         ("基準總報酬率", format_percent(metrics.benchmark_total_return)),
         ("基準最大回撤", format_percent(metrics.benchmark_max_drawdown)),

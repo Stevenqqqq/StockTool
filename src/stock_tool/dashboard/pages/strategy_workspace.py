@@ -22,13 +22,13 @@ from stock_tool.dashboard.presentation_mapper import (
     aggregate_fold_warnings,
     format_market_label,
     format_parameters_zh,
-    format_percentage,
     format_status_label,
     format_taiwan_company_display,
 )
 from stock_tool.dashboard.state import navigate_to_workspace
 from stock_tool.domain.models import Market, Symbol
 from stock_tool.runtime_paths import RuntimePaths
+from stock_tool.dashboard.components.backtest_evidence import render_backtest_evidence
 from stock_tool.strategies.registry import (
     StrategyDefinition,
     create_strategy,
@@ -467,19 +467,10 @@ def _render_run(
         st.warning("設定已變更，結果可能過期；請重新執行。")
     st.subheader("標準回測結果")
     if run.result is not None:
-        metrics = run.result.metrics
-        cols = st.columns(4)
-        cols[0].metric(
-            "總報酬",
-            format_percentage(metrics.total_return, with_sign=True, is_ratio=True),
+        render_backtest_evidence(st, run.result.metrics)
+        st.caption(
+            f"資料期間：{run.manifest.core['data']['start']} 至 {run.manifest.core['data']['end']}"
         )
-        cols[1].metric(
-            "最大回撤",
-            format_percentage(metrics.max_drawdown, is_ratio=True),
-        )
-        cols[2].metric("交易次數", str(metrics.number_of_trades))
-        data_period = f"{run.manifest.core['data']['start']} 至 {run.manifest.core['data']['end']}"
-        cols[3].metric("資料期間", data_period)
 
     health = getattr(run, "health", None)
     if health is not None:
@@ -536,12 +527,12 @@ def _render_health_details(st: Any, health: StrategyHealthRun) -> None:
             with cols[0]:
                 st.markdown("**樣本內表現 (In-Sample)**")
                 st.write(
-                    f"報酬：{train.total_return:+.2%}｜回撤：{train.max_drawdown:.2%}｜交易：{train.number_of_trades} 次"
+                    f"報酬：{train.total_return:+.2%}｜回撤：{train.max_drawdown:.2%}｜成交筆數：{train.number_of_trades} 次"
                 )
             with cols[1]:
                 st.markdown("**樣本外驗證 (Out-of-Sample)**")
                 st.write(
-                    f"報酬：{test.total_return:+.2%}｜回撤：{test.max_drawdown:.2%}｜交易：{test.number_of_trades} 次"
+                    f"報酬：{test.total_return:+.2%}｜回撤：{test.max_drawdown:.2%}｜成交筆數：{test.number_of_trades} 次"
                 )
         else:
             st.info("樣本外驗證結果不可用。")
@@ -554,7 +545,7 @@ def _render_health_details(st: Any, health: StrategyHealthRun) -> None:
                 st.write(
                     f"Fold {fold.fold_number}（{fold.test_period.start} 至 {fold.test_period.end}）："
                     f"報酬 {metrics.total_return:+.2%}｜回撤 {metrics.max_drawdown:.2%}｜"
-                    f"交易 {metrics.number_of_trades} 次。"
+                    f"成交筆數 {metrics.number_of_trades} 筆。"
                 )
         if health.sensitivity is not None:
             st.markdown("**參數敏感度各組合測試**")
@@ -563,7 +554,7 @@ def _render_health_details(st: Any, health: StrategyHealthRun) -> None:
                 param_label = format_parameters_zh(dict(item.parameters))
                 st.write(
                     f"{param_label} → 報酬 {metrics.total_return:+.2%}｜"
-                    f"回撤 {metrics.max_drawdown:.2%}｜交易 {metrics.number_of_trades} 次。"
+                    f"回撤 {metrics.max_drawdown:.2%}｜成交筆數 {metrics.number_of_trades} 筆。"
                 )
 
 
