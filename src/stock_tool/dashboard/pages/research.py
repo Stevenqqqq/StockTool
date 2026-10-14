@@ -17,6 +17,7 @@ from stock_tool.dashboard.components.research_chart import (
     render_research_chart,
 )
 from stock_tool.dashboard.components.research_header import render_research_header
+from stock_tool.dashboard.components.price_volume_observation import render_price_volume_observation
 from stock_tool.dashboard.components.risk_summary import render_risk_summary
 from stock_tool.dashboard.components.scorecard import render_scorecard
 from stock_tool.dashboard.components.search import render_global_search
@@ -57,14 +58,8 @@ def render_research_workspace(
         ("總覽", "圖表", "基本面", "評分解釋", "證據與資料", "風險與情境")
     )
     with overview:
-        if snapshot.company_profile is not None and snapshot.company_profile.dossier is not None:
-            _render_company_overview(st, snapshot, compact=True)
-        else:
-            company, chart = st.columns((1, 1))
-            with company:
-                _render_company_overview(st, snapshot, compact=True)
-            with chart:
-                _render_overview_chart(st, snapshot)
+        _render_overview_chart(st, snapshot)
+        _render_company_overview(st, snapshot, compact=True)
         render_risk_summary(st, snapshot)
     with chart_tab:
         _render_chart(st, snapshot)
@@ -245,7 +240,7 @@ def _render_company_overview(st: Any, snapshot: ResearchSnapshot, *, compact: bo
                 profile.symbol, profile.company_name, snapshot.symbol.market.value
             )
         )
-        render_company_dossier(st, profile.dossier)
+        render_company_dossier(st, profile.dossier, show_status=False)
         return
     st.caption("公司名稱與產業分類標示為事實資料；業務與產業鏈內容標示為研究推論。")
     st.markdown("**事實資料**")
@@ -294,13 +289,7 @@ def _render_company_inferences(st: Any, profile: Any) -> None:
 
 
 def _render_overview_chart(st: Any, snapshot: ResearchSnapshot) -> None:
-    st.subheader("價格圖")
-    model = build_research_chart(
-        snapshot.price_history,
-        indicators=snapshot.indicators,
-        period="1Y",
-    )
-    render_research_chart(st, model, compact=True)
+    render_price_volume_observation(st, snapshot)
 
 
 def _render_chart(st: Any, snapshot: ResearchSnapshot) -> None:
