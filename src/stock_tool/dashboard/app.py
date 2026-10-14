@@ -3699,11 +3699,17 @@ def _build_research_snapshot(st: Any, *, symbol: str, market: str) -> Any:
     display_symbol = _dashboard_symbol(symbol, canonical_market)
     canonical_symbol = Symbol(display_symbol, Market.parse(canonical_market))
     prices = _filter_symbol_market(st.session_state.price_data, display_symbol, canonical_market)
-    indicators = _filter_identity(
-        st.session_state.technical_indicators,
-        symbol=display_symbol,
+    from stock_tool.application.completed_daily_prices import completed_daily_prices
+
+    source = st.session_state.price_data_source or {}
+    prices, completion_notices = completed_daily_prices(
+        prices,
         market=canonical_market,
+        fetched_at=source.get("fetched_at"),
     )
+    # Recompute from the exact completed-bar view; cached indicators may include
+    # an intraday tail or a previous security. Keep the original session untouched.
+    indicators = compute_technical_indicators(prices) if not prices.empty else pd.DataFrame()
     fundamentals = _filter_identity(
         st.session_state.fundamental_scores,
         symbol=display_symbol,
@@ -3734,12 +3740,13 @@ def _build_research_snapshot(st: Any, *, symbol: str, market: str) -> Any:
         query_symbol=_optional_text(source.get("query_symbol")) or display_symbol,
         market=canonical_market,
         source_type=_research_source_type(source.get("source_type")),
-        fetched_at=_optional_text(source.get("updated_at")),
+        fetched_at=_optional_text(source.get("fetched_at"))
+        or _optional_text(source.get("updated_at")),
         last_data_date=(
             str(prices["date"].max()) if not prices.empty and "date" in prices else None
         ),
         row_count=len(prices),
-        warnings=tuple(source.get("warnings") or ()),
+        warnings=tuple(source.get("warnings") or ()) + completion_notices,
         limitations=("資料來源類型與最後資料日期依本次已載入資料顯示；不宣稱即時行情。",),
     )
     profile = _get_company_research_profile(st, display_symbol)

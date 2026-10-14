@@ -316,6 +316,7 @@ def test_dashboard_builds_market_qualified_research_snapshot_without_mutating_se
                 "provider": "fixture",
                 "query_symbol": "2330.TW",
                 "source_type": "線上下載",
+                "fetched_at": "2026-10-13T12:00:00Z",
             },
             "dashboard_status": "ready",
             "company_research_cache": {},

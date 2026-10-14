@@ -75,6 +75,15 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
         "最後資料日期",
         format_iso_datetime(price.last_data_date) if price else "資料不足",
     )
+    for notice in snapshot.source_metadata.warnings:
+        if notice.startswith("收盤研究："):
+            st.info(notice)
+    if snapshot.composite_score is None and snapshot.available_score is not None:
+        st.write(
+            f"可用項目評分：{snapshot.available_score:.1f} 分；"
+            f"評分項目覆蓋率 {format_percentage(snapshot.score_coverage, is_ratio=True)}。"
+            "僅按已具備項目換算，並非完整總分；分項見「評分解釋」。"
+        )
     question = (
         dossier.questions[0]
         if dossier is not None and dossier.questions
@@ -82,10 +91,18 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
     )
     st.markdown("**接下來先確認（待查，非已確認事實）**\n\n" + question)
     gaps = _visible_gaps(snapshot)
+    # Keep material gaps visible once; the full repeated technical text belongs below.
+    additional_gaps = _visible_gaps(snapshot, exclude_text=status_zh, compact=True)
+    if additional_gaps:
+        st.caption("待補資料：" + "；".join(additional_gaps))
     if gaps:
-        st.warning("關鍵缺口：" + "；".join(gaps))
+        st.caption(
+            "補救方式：公司內容可按「重新讀取公司資料」；評分缺項請到「評分解釋」核對所需欄位。"
+        )
 
     with st.expander("核對來源、完整限制與指標分數"):
+        for gap in gaps:
+            st.write(f"• {gap}")
         directory = current_names.get()
         if directory is not None:
             record, _ = directory.resolve(snapshot.symbol.market.value, snapshot.symbol.code)
@@ -132,7 +149,9 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
             st.write(f"• {risk}")
 
 
-def _visible_gaps(snapshot: ResearchSnapshot) -> tuple[str, ...]:
+def _visible_gaps(
+    snapshot: ResearchSnapshot, *, exclude_text: str = "", compact: bool = False
+) -> tuple[str, ...]:
     """Compress known repetitive disclosures; retain unknown gaps in full."""
     profile = snapshot.company_profile
     dossier = profile.dossier if profile is not None else None
@@ -150,11 +169,17 @@ def _visible_gaps(snapshot: ResearchSnapshot) -> tuple[str, ...]:
         ("既有評分模型缺少此必要資料", "評分資料不足，不能形成完整總分"),
     )
     for reason in reasons:
+        if reason and reason in exclude_text:
+            continue
+        if compact and reason.startswith(
+            ("產品列示不代表已量產", "本次已達頁數或時間上限", "畫面與 AI 共用精選的公司證據")
+        ):
+            continue
         label = next((short for prefix, short in mappings if reason.startswith(prefix)), reason)
         if label not in labels:
             labels.append(label)
     stale = _stale_reason(snapshot)
-    if stale and stale not in labels:
+    if stale and stale not in labels and stale not in exclude_text:
         labels.insert(0, stale)
     return tuple(labels)
 

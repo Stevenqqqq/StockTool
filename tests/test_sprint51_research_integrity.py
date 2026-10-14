@@ -121,6 +121,7 @@ def _workspace_state(
                 "provider": "yfinance",
                 "query_symbol": "2330.TW",
                 "source_type": "online",
+                "fetched_at": "2026-10-13T12:00:00Z",
                 "market": "TWSE",
             },
             "dashboard_status": "ready",
