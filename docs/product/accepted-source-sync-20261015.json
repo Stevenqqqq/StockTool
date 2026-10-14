@@ -1,0 +1,185 @@
+{
+  "updated_at": "2026-10-15",
+  "purpose": "Accepted source synchronization for consultant review; not an installation, release or new acceptance run",
+  "branch": "codex/sync-accepted-research-20261011",
+  "pull_request": "https://github.com/Stevenqqqq/StockTool/pull/1",
+  "remote_main_at_sync": "11ee8d7438e9a06115d3ab75a99d088d4ef55d13",
+  "previous_sync_head": "55fb4417453a539c00c8f1db5390e6d7d6b999dd",
+  "product_source_head": "78ebf7ec022ad75528f99b49c2bdffc522e8c02b",
+  "commits": [
+    {
+      "commit": "8e3825be015e5ae063e45a449a30a15242a7c5b5",
+      "scope": "Research Overview price/volume integration, shared scenario-date presentation, synthetic review helpers and regressions"
+    },
+    {
+      "commit": "78ebf7ec022ad75528f99b49c2bdffc522e8c02b",
+      "scope": "Normal research availability, TLS certificate path, partial results and warnings, completed-bar gate, exchange-local date and regressions"
+    }
+  ],
+  "acceptance_basis": "Product Owner relayed Sol independent scoped acceptance, including final r4 closure. Local evidence named below was read or fingerprinted; private paths and raw artifacts are retained locally. Earlier review findings remain historical and are closed only by their subsequent accepted fixes.",
+  "independent_evidence_fingerprints": [
+    {
+      "scope": "overview-ui",
+      "filename": "ui-verification-results.json",
+      "sha256": "28e9db1608486534b655c2568d0078c6fbcbffdc5a18de0b44fe627ca05cddf8"
+    },
+    {
+      "scope": "scenario-date-p1",
+      "filename": "independent-date-fix-ui.json",
+      "sha256": "6e303633b5eff8a1666b74728aab490eddc4a96a777046ffdb4044d96f093aa0"
+    },
+    {
+      "scope": "normal-research-r2-targeted",
+      "filename": "targeted.txt",
+      "sha256": "014edb5cf3a1b0de60782a5c6fabff4074388fae4bc4ed716654ea124cc287b7"
+    },
+    {
+      "scope": "completed-bars-r3-targeted",
+      "filename": "targeted.txt",
+      "sha256": "836e6c78ec02e6245e3a389a3c160717e817a65adbd3aed4a320ef195d85f986"
+    },
+    {
+      "scope": "timezone-r4-reopen-cache",
+      "filename": "independent-reopen-and-cache-final.txt",
+      "sha256": "c1f2a60ea95707f63b1bd4c071421c2a7a0f128eb12fd74fc387f294b2e388ed"
+    },
+    {
+      "scope": "timezone-r4-targeted",
+      "filename": "targeted.txt",
+      "sha256": "e0f61f97acd990304befa176ea2ac6ecda7947526ee847db477e96eea6bd54fc"
+    },
+    {
+      "scope": "timezone-r4-full",
+      "filename": "full-pytest.txt",
+      "sha256": "d674754ed705dc3d2e3095b5c5b46d19aa2ae6b75981fe55b79a1f337323eaa3"
+    }
+  ],
+  "closure_record": {
+    "filename": "normal-research-3006-r4-acceptance-20261015.md",
+    "sha256": "df04536697f96c1a06f33a84ed5c81514f1db29f304b15f49be1065a8527ff01",
+    "status": "r4 cross-timezone P1 independently passed; same-batch closure; existing limitations retained"
+  },
+  "source_files": {
+    "src/stock_tool/dashboard/pages/research.py": {
+      "sha256": "021043f55437884f692ca8a6f34efbc270b86225b8f0d95879042bc960d91670",
+      "accepted_source_index": "docs/product/normal-research-3006-20261013/source-index-r2.json",
+      "source_index_sha256": "a845f37cf8a51fd000ec19bdcaa1b8aca974b4a04a3a870e1a636d4fd92c9fb5"
+    },
+    "src/stock_tool/dashboard/components/price_volume_observation.py": {
+      "sha256": "78d939b92df2beab10f0a7ec2303fa850c9c20241528b3cd88c6d7cbd5494ce2",
+      "accepted_source_index": "docs/product/normal-research-3006-20261013/source-index-r2.json",
+      "source_index_sha256": "a845f37cf8a51fd000ec19bdcaa1b8aca974b4a04a3a870e1a636d4fd92c9fb5"
+    },
+    "tests/test_price_volume_observation.py": {
+      "sha256": "c6e67348fc76aff1bd52344a888956fffa49e4025e32c64516eecc7633d9b54c",
+      "accepted_source_index": "docs/product/research-overview-20261013/source-index.json",
+      "source_index_sha256": "9b63b5541634176d7ecfe727d53b9bf3967eb032d21cbbbf4d02f3906758e2ee"
+    },
+    "scripts/research_overview_review_app.py": {
+      "sha256": "c8a2f528cda5919caa0ca23fbd302ff0271e91000d4350ef821139b2eb6cc854",
+      "accepted_source_index": "docs/product/research-overview-20261013/source-index.json",
+      "source_index_sha256": "9b63b5541634176d7ecfe727d53b9bf3967eb032d21cbbbf4d02f3906758e2ee"
+    },
+    "src/stock_tool/dashboard/components/scenario_reference_presentation.py": {
+      "sha256": "281feab319f3cd7dde8293f1e97908a29231b2868c183d276a779ac6fcdbe26e",
+      "accepted_source_index": "docs/product/research-overview-date-fix-20261013/source-index.json",
+      "source_index_sha256": "7cf9141fe23cadb56f058a6519b79df68ab64abd3d03f3d7f64ad6c709f88ce8"
+    },
+    "src/stock_tool/dashboard/components/risk_summary.py": {
+      "sha256": "78b1e47991eafe5f81aa556dff914939a04c0dcadd361e1fa43613a5e0559a43",
+      "accepted_source_index": "docs/product/research-overview-date-fix-20261013/source-index.json",
+      "source_index_sha256": "7cf9141fe23cadb56f058a6519b79df68ab64abd3d03f3d7f64ad6c709f88ce8"
+    },
+    "tests/test_scenario_reference_presentation.py": {
+      "sha256": "ccac9194845d22e8a1c20699df16d68b7da44db4e9bcd050a6d7647f9bf65ec8",
+      "accepted_source_index": "docs/product/research-overview-date-fix-20261013/source-index.json",
+      "source_index_sha256": "7cf9141fe23cadb56f058a6519b79df68ab64abd3d03f3d7f64ad6c709f88ce8"
+    },
+    "scripts/research_overview_date_fix_review_app.py": {
+      "sha256": "e2e1a7b9ad865e9e38368f93fb4a9263d6d19d7b45afe27fcdbdf501abd736ad",
+      "accepted_source_index": "docs/product/research-overview-date-fix-20261013/source-index.json",
+      "source_index_sha256": "7cf9141fe23cadb56f058a6519b79df68ab64abd3d03f3d7f64ad6c709f88ce8"
+    },
+    "src/stock_tool/yfinance_runtime.py": {
+      "sha256": "9964528c287f5e3e31fdd7e5b442451203cfa09fa95490acd3cd58845371bf33",
+      "accepted_source_index": "docs/product/normal-research-3006-20261013/source-index-r2.json",
+      "source_index_sha256": "a845f37cf8a51fd000ec19bdcaa1b8aca974b4a04a3a870e1a636d4fd92c9fb5"
+    },
+    "src/stock_tool/dashboard/components/research_header.py": {
+      "sha256": "2fa3fd48a69809f2a29eef9cd3dfb0f8ab357881b2a12725b4a1a08f3b3c4336",
+      "accepted_source_index": "docs/product/normal-research-3006-20261014-r3/source-index-final.json",
+      "source_index_sha256": "783869a5f83b2607ed2fd97c0db452ba5b15b603bba9dfbdac8e912cb388a4ee"
+    },
+    "src/stock_tool/dashboard/components/company_dossier.py": {
+      "sha256": "d97aaf98f7ce946231a4aa0166629c3bd2fb3c96c0042976bb5674f8cb92d92a",
+      "accepted_source_index": "docs/product/normal-research-3006-20261013/source-index-r2.json",
+      "source_index_sha256": "a845f37cf8a51fd000ec19bdcaa1b8aca974b4a04a3a870e1a636d4fd92c9fb5"
+    },
+    "tests/test_normal_research_availability.py": {
+      "sha256": "e54366a52eda324efcf4dc1d42f425ab568f4ad5e868ea24f5367c888effb1e8",
+      "accepted_source_index": "docs/product/normal-research-3006-20261013/source-index-r2.json",
+      "source_index_sha256": "a845f37cf8a51fd000ec19bdcaa1b8aca974b4a04a3a870e1a636d4fd92c9fb5"
+    },
+    "src/stock_tool/dashboard/app.py": {
+      "sha256": "d0925690387dcb85626280a0ff665ff748cef3953e29e486a934172dd85c5d5c",
+      "accepted_source_index": "docs/product/normal-research-3006-20261014-r3/source-index-final.json",
+      "source_index_sha256": "783869a5f83b2607ed2fd97c0db452ba5b15b603bba9dfbdac8e912cb388a4ee"
+    },
+    "src/stock_tool/application/completed_daily_prices.py": {
+      "sha256": "2f312cde0662a6d325fa5495474b90b1df32fa493c141e5bd2c174c3e1dae4f0",
+      "accepted_source_index": "docs/product/normal-research-3006-20261014-r4/source-index.json",
+      "source_index_sha256": "097630366394691dccc8dbf87ef27b26e1eb0876db652e3ce69d677b1b095664"
+    },
+    "tests/test_completed_daily_prices.py": {
+      "sha256": "99d8ea45dbd086f60f4f780785791494c2877fae0a95596ff24391347c862dab",
+      "accepted_source_index": "docs/product/normal-research-3006-20261014-r4/source-index.json",
+      "source_index_sha256": "097630366394691dccc8dbf87ef27b26e1eb0876db652e3ce69d677b1b095664"
+    },
+    "tests/test_dashboard.py": {
+      "sha256": "96feea0d25d03317fe782d7d12ec072c575b7dcbcff08095dfbea584599f4113",
+      "accepted_source_index": "docs/product/normal-research-3006-20261014-r3/source-index-final.json",
+      "source_index_sha256": "783869a5f83b2607ed2fd97c0db452ba5b15b603bba9dfbdac8e912cb388a4ee"
+    },
+    "tests/test_sprint51_research_integrity.py": {
+      "sha256": "d75f8955078ce4e0a059cbe69982c031093c4651174b7a200ccf0eeb25e7f034",
+      "accepted_source_index": "docs/product/normal-research-3006-20261014-r3/source-index-final.json",
+      "source_index_sha256": "783869a5f83b2607ed2fd97c0db452ba5b15b603bba9dfbdac8e912cb388a4ee"
+    }
+  },
+  "latest_frozen_product_source_index": {
+    "filename": "normal-research-3006-20261014-r4/build/source-after.json",
+    "sha256": "5869d3cbe2a1ed0aff02e5219c3fe586ac6201dcb151d9e8d27647f851f19c07",
+    "matched_product_files": 175
+  },
+  "historical_validation": {
+    "independent_targeted_passed": 43,
+    "independent_full_passed": 1977,
+    "independent_full_warnings": 2,
+    "implementer_total_coverage_percent": 83.53,
+    "rerun_during_sync": false,
+    "curated_branch_test_count_claimed": false
+  },
+  "boundaries": {
+    "scenario_console": "independently accepted synthetic-only",
+    "real_data_formal_scenario_research": "incomplete / NO-GO",
+    "formal_installed_reference": "v1.4.3 itemized acceptance, not updated by this source sync",
+    "black_cli": "existing limitations retained",
+    "new_provider": false,
+    "new_binary": false,
+    "install": false,
+    "publish": false,
+    "merge_main": false
+  },
+  "sync_checks": {
+    "new_allowlisted_files_matched": 17,
+    "cumulative_synchronized_source_test_fixture_helper_files_matched": 72,
+    "all_current_stock_tool_product_files_match_local": true,
+    "project_source_privacy_findings": 0,
+    "new_commit_content_and_private_path_findings": 0,
+    "new_document_content_and_private_path_findings": 0,
+    "diff_check": "passed before document commit; final committed range checked separately",
+    "original_preexisting_files_unchanged": 1698,
+    "only_new_public_status_and_ledger_added_to_original_worktree": true,
+    "generated_egg_info_and_bytecode_excluded": true
+  }
+}
