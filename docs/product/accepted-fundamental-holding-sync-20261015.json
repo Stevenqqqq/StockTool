@@ -1,0 +1,48 @@
+{
+  "updated_at": "2026-10-15",
+  "branch": "codex/sync-accepted-research-20261011",
+  "pull_request": "https://github.com/Stevenqqqq/StockTool/pull/1",
+  "previous_head": "9bb180d2e9ad08ff6bb4a742cb7a0df960d4e723",
+  "product_source_head": "72d27b33fb39608bd2f54dc2f9c75e745c2d87d9",
+  "acceptance": "Sol independently accepted the limited fundamental-persistence and cached-holding-valuation r2 scope; Product Owner authorized this source sync. Not installation or release acceptance.",
+  "independent_report": {
+    "filename": "INDEPENDENT_ACCEPTANCE.md",
+    "sha256": "791e3186e17ec43cc1643440d54d544104a4254f173b4dc722879e73956f809d"
+  },
+  "accepted_frozen_sha256": "cc7c38fddadb64673841d398a09365b0b6d535ad1e473bc0a3e11c9328694b56",
+  "accepted_payload_sha256": "c4a97a7eb421bc4e4ba5dac5d3339e82c2a191959bb9b61c239339193ca0fa3c",
+  "source_files": {
+    "src/stock_tool/application/holding_analysis.py": "477fba3707dce27d5cf29a5e9e5658b018fbadd38bfb0c228101df22c84be4a5",
+    "src/stock_tool/dashboard/app.py": "3e9b993832b8e39289414b0509eec8cd7822b876f306a637b3ab0a75a654a0de",
+    "src/stock_tool/dashboard/pages/portfolio_workspace.py": "c9cfd428457a776137c7c5c4f82515693c2081f715a1e86aa6d6ae762e311935",
+    "tests/test_fundamental_persistence_and_holding_reference.py": "e460ac096415c0f2b8bf3c92f9859af92bbb09e82c17db3401981799ac432f31",
+    "scripts/fundamental_holding_cache_review_app.py": "c5835022c4657953500f0f0d774b7d0904ef783a66bf0a1d9867e2c0d600d360"
+  },
+  "historical_independent_verification": {
+    "targeted_passed": 85,
+    "full_passed": 2000,
+    "warnings": 2,
+    "total_coverage_percent": 83.57073121886499,
+    "pure_branch_coverage_percent": 74.5569875151027,
+    "not_rerun_for_sync": true,
+    "not_test_counts_of_curated_github_branch": true
+  },
+  "sync_checks": {
+    "all_175_product_sources_match_accepted_index": true,
+    "included_files_exact_bytes": true,
+    "explicit_file_allowlist": true
+  },
+  "excluded": [
+    "machine-specific build scripts",
+    "candidate binaries",
+    "raw acceptance artifacts and screenshots",
+    "runtime, real holdings, credentials, caches"
+  ],
+  "retained_limits": [
+    "Seven-day reference-price bound, strict FX checks and best-effort CSV persistence.",
+    "Unknown legacy market identities are not guessed or migrated.",
+    "Repository Black CLI limitations; no blanket quality-gate pass.",
+    "Scenario Research synthetic console accepted; real-data qualification incomplete / formal research NO-GO.",
+    "Formal installed v1.4.3 and previous itemized delivery limitations unchanged."
+  ]
+}
