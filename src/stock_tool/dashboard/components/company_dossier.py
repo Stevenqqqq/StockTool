@@ -27,25 +27,36 @@ def _section(st: Any, dossier: CompanyDossier, section: str) -> None:
                 _source(st, fact)
 
 
-def render_company_dossier(st: Any, dossier: CompanyDossier) -> None:
+def render_company_dossier(st: Any, dossier: CompanyDossier, *, show_status: bool = True) -> None:
     if st.button("重新讀取公司資料", key=f"company_refresh_{dossier.market}_{dossier.symbol}"):
         st.session_state["company_details_force"] = True
         st.rerun()
     st.caption(f"研究角度：{dossier.industry_lens}｜本次讀取 {len(dossier.documents)} 個官網頁面")
-    if dossier.state == "stale":
+    if show_status and dossier.state == "stale":
         st.warning("本次更新失敗，以下是前次官網資料，不能視為最新狀況。")
     st.caption("官網揭露是公司自己的說法。業務存在、進展及收入貢獻需要分開核對。")
 
-    for item in explain_company(dossier):
+    if show_status and dossier.gaps:
+        st.warning("資料缺口：" + "；".join(dossier.gaps))
+    explanations = explain_company(dossier)
+    for item in explanations[:1]:
         st.markdown(f"**{item.heading}**")
-        st.caption(item.kind)
-        st.text(item.text)
+        st.write(item.kind)
+        st.write(item.text)
         if item.evidence_indices:
             with st.expander(f"核對「{item.heading}」的依據"):
                 for index in dict.fromkeys(item.evidence_indices):
                     fact = dossier.facts[index]
                     st.text(fact.excerpt)
                     _source(st, fact)
+
+    with st.expander("進一步理解營運、產業機制與待驗證風險"):
+        for item in explanations[1:]:
+            st.markdown(f"**{item.heading}**")
+            st.write(item.kind)
+            st.write(item.text)
+            for index in dict.fromkeys(item.evidence_indices):
+                _source(st, dossier.facts[index])
 
     roles = [fact for fact in dossier.facts if fact.section == "公司角色"]
     if roles:

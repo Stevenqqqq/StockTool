@@ -23,6 +23,75 @@ class CorporateActionDataError(ValueError):
 
 CORPORATE_ACTION_POLICY_VERSION = "corporate-action-contract-v1"
 
+# Screening boundary, not an inferred adjustment factor or a market limit.
+RAW_DISCONTINUITY_LIMIT = 0.25
+
+
+def raw_research_safety_errors(
+    prices: pd.DataFrame,
+    actions: tuple[CorporateAction, ...] = (),
+    *,
+    price_policy: PricePolicy | None = None,
+) -> tuple[str, ...]:
+    """Fail closed before raw-series strategy signals or performance are generated.
+
+    Event accounting alone does not make raw indicators split-continuous. Until
+    a verified signal/execution price contract is wired, even explained events
+    remain blocked here. No ratios are inferred and no input is adjusted.
+    """
+    policy = PricePolicy.RAW_PRICE_WITH_EXPLICIT_ACTIONS if price_policy is None else price_policy
+    if policy != PricePolicy.RAW_PRICE_WITH_EXPLICIT_ACTIONS:
+        return ("資料不足：此策略流程尚未驗證調整價格的訊號／成交契約。",)
+    required = {"market", "symbol", "date", "open", "close"}
+    if prices.empty or not required.issubset(prices.columns):
+        return ("資料不足：價格完整性檢查需要市場、代號、日期、開盤及收盤價。",)
+    frame = prices.copy(deep=True)
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce", utc=True)
+    for column in ("open", "close"):
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+        if not frame[column].map(lambda x: pd.notna(x) and isfinite(x) and x > 0).all():
+            return ("資料不足：價格包含缺漏、非有限或非正值，已停止回測。",)
+    if (
+        frame[list(required)].isna().any().any()
+        or frame.duplicated(["market", "symbol", "date"]).any()
+    ):
+        return ("資料不足：價格身分／日期缺漏或重複，已停止回測。",)
+    errors: list[str] = []
+    for (market, symbol), group in frame.groupby(["market", "symbol"]):
+        group = group.sort_values("date")
+        start, end = group["date"].iloc[0].date(), group["date"].iloc[-1].date()
+        relevant = [
+            a
+            for a in actions
+            if a.symbol.code == str(symbol)
+            and a.symbol.market.value == str(market)
+            and start < date.fromisoformat(a.effective_date) <= end
+        ]
+        for action in relevant:
+            complete = (
+                action.is_available_on(action.effective_date)
+                and action.confidence == "complete"
+                and action.completeness == "complete"
+            )
+            reason = (
+                "事件已記錄，但原始訊號序列尚未驗證公司行動調整"
+                if complete
+                else "事件來源完整性或可得日期不足"
+            )
+            errors.append(
+                f"資料不足：{market}/{symbol} {action.effective_date} {reason}；已停止回測。"
+            )
+        previous = group["close"].shift()
+        jumps = ((group["open"] / previous - 1).abs() >= RAW_DISCONTINUITY_LIMIT) | (
+            (group["close"] / previous - 1).abs() >= RAW_DISCONTINUITY_LIMIT
+        )
+        for when in group.loc[jumps, "date"]:
+            if not any(a.effective_date == when.date().isoformat() for a in relevant):
+                errors.append(
+                    f"資料不足：{market}/{symbol} {when.date()} 原始價格出現至少 25% 的重大不連續，缺少可核對事件；不猜測調整比例，已停止回測。"
+                )
+    return tuple(dict.fromkeys(errors))
+
 
 class CorporateActionType(StrEnum):
     """Corporate actions supported by the deterministic Sprint 13 contract."""

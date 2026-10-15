@@ -239,6 +239,10 @@ def test_explore_workspace_search_shows_explainable_result_and_current_research_
 def test_home_reads_runtime_portfolio_and_watchlist_counts_on_first_open(
     tmp_path: Path, monkeypatch
 ) -> None:
+    from stock_tool.dashboard.components import daily_holdings
+    from stock_tool.application.daily_holdings_job import DailyJob
+
+    monkeypatch.setattr(daily_holdings, "start_refresh", lambda *_a, **_k: DailyJob())
     runtime = tmp_path / "runtime"
     data_dir = runtime / "data"
     data_dir.mkdir(parents=True)
@@ -259,13 +263,15 @@ def test_home_reads_runtime_portfolio_and_watchlist_counts_on_first_open(
     app_path = Path(__file__).parents[1] / "src" / "stock_tool" / "dashboard" / "app.py"
 
     app = AppTest.from_file(str(app_path)).run(timeout=20)
-    metrics = {metric.label: metric.value for metric in app.metric}
-
-    assert metrics["自選股"] == "4"
-    assert metrics["持股筆數"] == "4"
+    assert not app.exception
+    assert any("持股筆數：4｜自選股：4" in item.value for item in app.caption)
 
 
 def test_home_primary_actions_select_the_retained_child_pages(tmp_path: Path, monkeypatch) -> None:
+    from stock_tool.dashboard.components import daily_holdings
+    from stock_tool.application.daily_holdings_job import DailyJob
+
+    monkeypatch.setattr(daily_holdings, "start_refresh", lambda *_a, **_k: DailyJob())
     runtime = tmp_path / "runtime"
     data_dir = runtime / "data"
     data_dir.mkdir(parents=True)
@@ -283,7 +289,9 @@ def test_home_primary_actions_select_the_retained_child_pages(tmp_path: Path, mo
     app_path = Path(__file__).parents[1] / "src" / "stock_tool" / "dashboard" / "app.py"
     app = AppTest.from_file(str(app_path)).run(timeout=20)
 
-    next(button for button in app.button if button.label == "查看持倉").click().run(timeout=20)
+    next(button for button in app.button if button.label == "查看持股與完整風險").click().run(
+        timeout=20
+    )
 
     assert app.radio[0].value == "持倉"
     assert any(item.value == "持倉" for item in app.title)

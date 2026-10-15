@@ -190,6 +190,9 @@ class _FakeStreamlit(_FakeContainer):
     def dataframe(self, value: object, **_: object) -> None:
         self.events.append(("dataframe", value))
 
+    def vega_lite_chart(self, *, spec: object, **_: object) -> None:
+        self.events.append(("vega", spec))
+
     def line_chart(self, value: object, **_: object) -> None:
         self.events.append(("line", value))
 
@@ -420,7 +423,7 @@ def test_complete_ohlc_renders_only_finite_visible_price_data() -> None:
     visible_data = cast(
         pd.DataFrame, next(value for kind, value in fake.events if kind == "dataframe")
     )
-    assert list(visible_data.columns) == ["date", "close", "volume"]
+    assert list(visible_data.columns) == ["date", "open", "high", "low", "close", "volume"]
     assert visible_data["date"].notna().all()
     assert (
         visible_data.select_dtypes(include="number")

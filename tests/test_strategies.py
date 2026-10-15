@@ -22,9 +22,7 @@ def _price_frame(closes: list[float], *, volumes: list[float] | None = None) -> 
     volume = volumes if volumes is not None else [1000.0] * len(closes)
     return pd.DataFrame(
         {
-            "date": pd.date_range("2024-01-01", periods=len(closes), freq="D").strftime(
-                "%Y-%m-%d"
-            ),
+            "date": pd.date_range("2024-01-01", periods=len(closes), freq="D").strftime("%Y-%m-%d"),
             "symbol": "2330",
             "open": close,
             "high": close + 0.5,
@@ -139,7 +137,7 @@ def test_fundamental_growth_strategy_uses_backward_available_data() -> None:
     prices = _price_frame([10, 11, 12, 13])
     fundamentals = pd.DataFrame(
         {
-            "date": ["2024-01-01", "2024-01-03"],
+            "available_date": ["2024-01-01", "2024-01-03"],
             "symbol": ["2330", "2330"],
             "eps_growth": [0.2, 0.01],
             "revenue_growth": [0.2, 0.01],
@@ -178,4 +176,3 @@ def test_strategies_do_not_mutate_input_data() -> None:
     strategy.generate_signals(prices)
 
     pd.testing.assert_frame_equal(prices, original)
-

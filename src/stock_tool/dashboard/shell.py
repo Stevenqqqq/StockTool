@@ -99,6 +99,7 @@ class DashboardShellDependencies:
     build_research_snapshot: Callable[..., Any] | None = None
     build_daily_brief: Callable[[Any], DailyBrief] | None = None
     build_daily_research_loop: Callable[[Any], DailyResearchLoopResult] | None = None
+    render_daily_holdings: Callable[[Any], HomeAction | None] | None = None
     refresh_daily_data: Callable[[Any], DailyRefreshResult] | None = None
     run_daily_research: Callable[[], DailyResearchRunOutcome] | None = None
     build_daily_research_run: Callable[[], DailyResearchRunManifest | None] | None = None
@@ -289,6 +290,16 @@ def _render_home_workspace(
         portfolio_path=dependencies.portfolio_path,
         watchlist_path=dependencies.watchlist_path,
     )
+    holdings_daily_available = bool(summary.portfolio_count and dependencies.render_daily_holdings)
+    if holdings_daily_available and dependencies.render_daily_holdings is not None:
+        holding_action = dependencies.render_daily_holdings(st)
+        if holding_action is not None:
+            _handle_home_action(st, dependencies, holding_action)
+            _execute_pending_shell_search(st, dependencies)
+            if st.session_state.get("dashboard_show_research_workspace", False):
+                st.rerun()
+                return
+            st.warning("這筆持股研究暫時無法開啟；每日摘要與已保存觀察仍保留，可稍後再試。")
     daily_brief = dependencies.build_daily_brief(st) if dependencies.build_daily_brief else None
     inbox_entries: tuple[ResearchInboxEntry, ...] = ()
     inbox_brief: DailyResearchBrief | None = None
@@ -355,6 +366,7 @@ def _render_home_workspace(
         updated_at=source.get("end_date"),
         summary_warnings=summary.warnings + ((inbox_warning,) if inbox_warning else ()),
         daily_brief=daily_brief,
+        holdings_daily_available=holdings_daily_available,
         daily_research_loop=(
             dependencies.build_daily_research_loop(st)
             if dependencies.build_daily_research_loop

@@ -37,11 +37,27 @@ class _FakeStreamlit(_Column):
         self.events: list[tuple[str, object]] = []
         super().__init__(self.events)
 
+    def expander(self, *args, **kwargs):
+        self.events.append(("expander", args[0]))
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return None
+
     def title(self, value: str) -> None:
         self.events.append(("title", value))
 
     def caption(self, value: str) -> None:
         self.events.append(("caption", value))
+
+    def write(self, value: str) -> None:
+        self.events.append(("write", value))
+
+    def link_button(self, label: str, url: str) -> None:
+        self.events.append(("link", (label, url)))
 
     def warning(self, value: str) -> None:
         self.events.append(("warning", value))
@@ -148,7 +164,9 @@ def _visible(fake: _FakeStreamlit) -> str:
 
 
 def _status(fake: _FakeStreamlit) -> str:
-    return next(str(value) for kind, value in fake.events if kind == "caption" and "研究狀態" in str(value))
+    return next(
+        str(value) for kind, value in fake.events if kind == "warning" and "研究狀態" in str(value)
+    )
 
 
 def _document() -> CompanyDocument:
@@ -196,8 +214,7 @@ def test_full_score_does_not_hide_missing_company_profile() -> None:
     assert "資料覆蓋率" not in visible
     assert "部分可用：沒有可驗證的公司介紹資料" in _status(fake)
     assert not any(
-        kind == "metric" and "評分項目覆蓋率（依權重）" in str(value)
-        for kind, value in fake.events
+        kind == "metric" and "評分項目覆蓋率（依權重）" in str(value) for kind, value in fake.events
     )
     assert any(
         kind == "markdown" and "評分項目覆蓋率（依權重）" in str(value)
@@ -288,7 +305,9 @@ def test_partial_dossier_shows_real_documents_gaps_and_missing_price() -> None:
     )
     fake = _FakeStreamlit()
 
-    render_research_header(fake, _snapshot(profile=_profile(dossier=dossier), price_data=pd.DataFrame()))
+    render_research_header(
+        fake, _snapshot(profile=_profile(dossier=dossier), price_data=pd.DataFrame())
+    )
 
     visible = _visible(fake)
     assert "公司資料狀態：已取得 1 個官方頁面" in visible
@@ -297,3 +316,33 @@ def test_partial_dossier_shows_real_documents_gaps_and_missing_price() -> None:
     assert "最新可用收盤價" in visible
     assert "最後資料日期" in visible
     assert visible.count("資料不足") >= 2
+
+
+def test_compact_header_keeps_business_price_question_and_gaps_before_details():
+    fake = _FakeStreamlit()
+    dossier = _dossier(
+        documents=(_document(),),
+        gaps=(
+            "尚未取得足夠的公司揭露的風險公司證據。",
+            "部分頁面未提供發布／生效日期；取得日期只能證明本次讀到，不代表內容最新。",
+            "新的未知缺口必須原樣保留。",
+        ),
+        state="stale",
+    )
+    snapshot = _snapshot(profile=_profile(dossier=dossier))
+    render_research_header(fake, snapshot)
+    cut = next(i for i, (kind, _) in enumerate(fake.events) if kind == "expander")
+    first_screen = "\n".join(str(value) for _, value in fake.events[:cut])
+    for text in (
+        "這家公司做什麼",
+        "最新可用收盤價",
+        "最後資料日期",
+        "接下來先確認",
+        "資料可能過期",
+        "公司風險原文不足",
+        "部分文件日期未知",
+        "新的未知缺口必須原樣保留",
+    ):
+        assert text in first_screen
+    assert "評分項目覆蓋率" not in first_screen
+    assert dossier.gaps[1] in _visible(fake)
