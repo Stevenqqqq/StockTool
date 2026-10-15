@@ -3633,15 +3633,20 @@ def _ensure_symbol_data(
                 display_symbol, market=cast(ProviderMarket, market)
             )
             fetched_fundamental_rows = len(fundamental_result.data)
-            _persist_auto_fundamentals(fundamental_result.data)
+            # Only the new explicit provider request establishes this identity.
+            # Persist exactly the same qualified rows used in the session;
+            # existing UNKNOWN CSV rows are never assigned by price inference.
+            # AUTO fundamentals cannot borrow a market resolved only by prices.
+            fetched_fundamentals = _qualify_generic_frame(
+                fundamental_result.data,
+                symbol=display_symbol,
+                market=_canonical_market_or_unknown(market),
+            )
+            _persist_auto_fundamentals(fetched_fundamentals)
             fundamentals = _merge_fundamental_identity_frames(
                 [
                     st.session_state.fundamentals,
-                    _qualify_generic_frame(
-                        fundamental_result.data,
-                        symbol=display_symbol,
-                        market=requested_market,
-                    ),
+                    fetched_fundamentals,
                 ]
             )
             _set_fundamentals_state(st, fundamentals)
