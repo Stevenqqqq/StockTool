@@ -1,11 +1,11 @@
 # StockTool 目前狀態
 
-更新日期：2026-10-15。供第三方顧問閱讀已獨立驗收的原始碼；產品決定與發布核准仍由 Product Owner 負責。
+更新日期：2026-10-18。供第三方顧問閱讀已獨立驗收的原始碼；產品決定與發布核准仍由 Product Owner 負責。
 
 ## 版本與閱讀基準
 
 - GitHub：PR [#1](https://github.com/Stevenqqqq/StockTool/pull/1)，分支 `codex/sync-accepted-research-20261011`，尚未合併 main。
-- 本頁對應的最新程式提交：`72d27b33fb39608bd2f54dc2f9c75e745c2d87d9`；文件在後續獨立提交保存。分支最新 HEAD 請以 GitHub 或 `git rev-parse HEAD` 為準。
+- 本頁對應的最新程式提交：`abe51c7c8d28718422071c819fc8156646031709`；文件在後續獨立提交保存。分支最新 HEAD 請以 GitHub 或 `git rev-parse HEAD` 為準。
 - 總覽與情境日期呈現提交：`8e3825be015e5ae063e45a449a30a15242a7c5b5`。前次同步基準：`55fb4417453a539c00c8f1db5390e6d7d6b999dd`；本次核對 main：`11ee8d7438e9a06115d3ab75a99d088d4ef55d13`。
 - 正式本機安裝參考仍為 **v1.4.3 的分項驗收狀態**。本分支的新原始碼、候選內部版本字串及候選驗收，均不代表正式安裝已更新。
 - 最新基本面／持股來源追溯：[r2 同步帳本](accepted-fundamental-holding-sync-20261015.json)。
@@ -66,3 +66,13 @@
 1. 第三方顧問先審閱本頁、來源帳本及 PR 差異，決定是否需要下一批產品改善。
 2. 若要將已驗收修復交付日常使用，另行核准版本化、安裝交付與必要驗證；本 PR 不自動授權。
 3. 若要開放真實資料 Scenario 研究，先決定既有官方資料詢問方案，補足資格證據；不以合成通過或一般行情可讀取代。
+
+## 自選股多檔比較 r3（2026-10-18 同步）
+
+- 已整合正常自選股導覽，可比較 2～5 檔：共用公司名稱、有效收盤、5／20 交易日報酬、SMA20／60 相對位置、當日量／前20日均量比、日期與來源，並跳轉既有個股研究。重用 completed_daily_prices，不增加 provider、AI、策略或綜合評分。
+- 同日期可依既有指標排序；日期不一致提示並停用排名。單檔或單項缺漏不清空其他結果；更新失敗保留既有行情並明示狀態。
+- 入口：`src/stock_tool/application/watchlist_comparison.py`、`src/stock_tool/dashboard/components/watchlist_comparison.py`、`dashboard/app.py::_page_watchlist`。回歸：`tests/test_watchlist_comparison.py`；合成驗證入口：`scripts/watchlist_comparison_r3_review_app.py`。
+- Sol 來源 UI／25 項定向、測試路徑修正、來源與候選綁定已通過。歷史完整回歸 2022 passed／2 warnings，總覆蓋率 83.65%、純分支 74.70%；本次同步未重跑驗收。
+- 10/18 唯一 EXE 已獨立補驗完整／局部缺漏、排序、日期不同、正常導覽、3006→6669 研究切換及離線保留。先前 EXE 比較頁整體未驗證狀態由此限定補驗取代；**窄畫面、跨程序重啟、真實供應商與資料庫持久性仍未在本批新增驗證**。合成資料不代表真實績效。
+- Black CLI、正式安裝既有限制，以及 Scenario Research 真實資料 incomplete／NO-GO 均保留；不代表已安裝版本更新。
+- [同步來源與驗收帳本](accepted-watchlist-r3-sync-20261018.json)保存原始檔及獨立報告 SHA256。只同步七個已驗收程式／測試／合成 helper；排除候選 EXE、原始擷取、私人資料及其他本機未驗收變更。兩份舊測試保留驗收原始 bytes，因此包含換行差異；實質修改僅測試執行器與非 Temp 路徑。

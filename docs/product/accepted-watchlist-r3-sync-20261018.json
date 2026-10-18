@@ -1,0 +1,50 @@
+{
+  "updated_at": "2026-10-18",
+  "previous_head": "18d449b3ef630a7d07db061fff8355a07e3a4840",
+  "product_source_head": "abe51c7c8d28718422071c819fc8156646031709",
+  "acceptance": "Sol accepted synthetic source UI, test isolation fixes and frozen EXE comparison UI. Not installation or release acceptance.",
+  "reports": [
+    {
+      "filename": "INDEPENDENT_REVIEW.md",
+      "sha256": "470e71478647a9fc9c9e9dc4bf4e833054a52ae733bb53097e7f9cf9d6ebf323"
+    },
+    {
+      "filename": "INDEPENDENT_PERMISSION_BINDING_REVIEW.md",
+      "sha256": "98c5da01f1c3baace73ddbe2ad78f0b8ab64268bb59161c0bac7a7b2c673ca6e"
+    },
+    {
+      "filename": "EXE_UI_ACCEPTANCE.md",
+      "sha256": "2f74126e3754ef1533a93103b32e9f58eeac743e93d3b93be5b3cdee063bd4f2"
+    }
+  ],
+  "source_files": {
+    "src/stock_tool/dashboard/components/watchlist_comparison.py": "ec6052323d46d0a47038ef3c38aa06ff132085cddb98d8000768698b04f2b310",
+    "src/stock_tool/application/watchlist_comparison.py": "ce4a35e7459274a32f7e2bd9f4dfe44dba95dc62d1dca7b938b1bc9369f5724c",
+    "src/stock_tool/dashboard/app.py": "c4cafd6da463a61bf13b5b7582c520c5ef77478afcd045e67842ba753d2b70de",
+    "tests/test_watchlist_comparison.py": "7e4254799d9ef9b831be98ae76fb7bdf69a3663075eb1e043df486f700ed2ae6",
+    "tests/test_browser_e2e_cdp.py": "666b83deacd35285d71a5ebb3455b74e9de778deff56e96c210e36ff53ad6c5a",
+    "tests/test_market_monitor.py": "0d8fd20f114a827742373c4717dc7a3a6ab21c87018a90ffbc1c5fc7dff9da02",
+    "scripts/watchlist_comparison_r3_review_app.py": "3c880c48ea300e2448df664a6b3244163e5a00f2d1c42c3d094b925d11b1a94e"
+  },
+  "frozen_evidence_sha256": "0187013c7e151debee14f613f71ad389a7c0cf4bc3fd6ffee9ab07ba868cf911",
+  "historical_verification": {
+    "targeted_passed": 25,
+    "full_passed": 2022,
+    "warnings": 2,
+    "total_coverage_percent": 83.65382223438394,
+    "branch_coverage_percent": 74.69506098780244,
+    "rerun_for_sync": false
+  },
+  "limitations": [
+    "Narrow EXE layout, cross-process restart, live providers and database persistence not newly verified",
+    "Black CLI limitation retained",
+    "Scenario synthetic accepted; real-data qualification incomplete / NO-GO",
+    "Installed v1.4.3 unchanged"
+  ],
+  "excluded": [
+    "Binaries, raw evidence and screenshots",
+    "Real holdings, credentials, caches and private data",
+    "Unrelated working-tree changes and deletions"
+  ],
+  "byte_policy": "Exact accepted bytes retained, including CRLF conversion in two existing tests; substantive diff verified ignoring line endings."
+}
