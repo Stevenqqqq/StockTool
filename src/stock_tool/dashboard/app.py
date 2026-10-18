@@ -870,9 +870,22 @@ def _page_watchlist(st: Any) -> None:
     st.caption("自選股會儲存在 data/watchlist.csv，可搭配自動抓資料逐檔研究。")
     watchlist = _get_watchlist(st)
 
+    from stock_tool.dashboard.components.watchlist_comparison import render_watchlist_comparison
+    from stock_tool.dashboard.shell import _route_explore_research
+
+    render_watchlist_comparison(
+        st,
+        build_effective_watchlist(watchlist, _get_portfolio(st)),
+        load_prices=lambda: _portfolio_price_context(st),
+        refresh=lambda symbol: _hydrate_daily_symbol(st, symbol),
+        on_research=lambda symbol: _route_explore_research(st, symbol),
+    )
+
     col1, col2, col3 = st.columns([1, 1, 2])
     symbol = col1.text_input("新增股票代號", value="2330", key="watchlist_symbol")
-    market = col2.selectbox("市場", ["TW", "US", "AUTO", "CUSTOM"], key="watchlist_market")
+    market = col2.selectbox(
+        "市場", ["TWSE", "TPEX", "US", "TW", "AUTO", "CUSTOM"], key="watchlist_market"
+    )
     note = col3.text_input("備註", value="", key="watchlist_note")
     if st.button("加入 / 更新自選股"):
         watchlist = add_watchlist_symbol(watchlist, symbol=symbol, market=market, note=note)

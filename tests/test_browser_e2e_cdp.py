@@ -9,6 +9,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -309,7 +310,7 @@ async def _run_real_browser_e2e(tmp_path: Path, monkeypatch):
     server_stderr = server_stderr_path.open("wb")
     streamlit_proc = subprocess.Popen(
         [
-            Path(".venv/Scripts/python.exe").resolve(),
+            sys.executable,
             "-m",
             "streamlit",
             "run",
