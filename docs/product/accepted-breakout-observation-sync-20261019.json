@@ -1,0 +1,20 @@
+{
+  "scope": "Accepted breakout observation v1 only; not installed release or formal Scenario qualification",
+  "files": {
+    "src/stock_tool/application/breakout_observation.py": "0b35e5e693c2c4a0ff9d62b603b42dcbdf3835990212ca897a8dd157486d1bf7",
+    "src/stock_tool/dashboard/components/breakout_observation.py": "509654aa786fb26809c1cc5d71cdd53ca20e3f640d97b2a8ba72c7d6a727aecf",
+    "src/stock_tool/dashboard/components/price_volume_observation.py": "06ae12818a12dc517a5900a16a87ce21697156ac37ac5852d78f971d8f15b2d2",
+    "tests/test_breakout_observation.py": "547a7b15eb8bda0f41c63b54b756b13f12e7217bd814eee7a7c52764f83d4321"
+  },
+  "independent_report_sha256": "d58666b3c3bc5ac606cbcfa4e21ec0bf8c774c471f2e80c90c5cbd41575676e0",
+  "evidence_index_sha256": "fc223c3de57772c1e057c90016806080fbf599c85fb7dac13da2213b1706bcc2",
+  "excluded": [
+    "raw provider CSV",
+    "candidate binaries",
+    "runtime",
+    "secrets",
+    "machine-specific reports",
+    "unrelated working-tree changes"
+  ],
+  "privacy_check": "allowlisted UTF-8 code/tests; no credential patterns or local personal paths"
+}
