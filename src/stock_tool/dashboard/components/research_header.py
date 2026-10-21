@@ -16,6 +16,8 @@ from stock_tool.dashboard.presentation_mapper import (
 from stock_tool.domain.models import MissingDataState
 from stock_tool.dashboard.instrument_names import current_names, name_notice
 from stock_tool.company_explanation import explain_company
+from stock_tool.application.breakout_observation import observe_breakout
+from stock_tool.dashboard.components.price_volume_observation import observation_summary
 
 
 def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
@@ -57,17 +59,19 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
     if explanations:
         # Use existing explanation sentences verbatim, never a new model/inference.
         sentences = explanations[0].text.split("。")
-        business = "。".join(sentences[:2]).rstrip("。") + "。"
-        st.markdown("**這家公司做什麼**\n\n" + business)
+        business = sentences[0].rstrip("。") + "。"
     else:
-        st.markdown("**這家公司做什麼**\n\n公司業務證據尚不足，不能只靠名稱或產業猜測。")
+        business = "公司業務證據尚不足，不能只靠名稱或產業猜測。"
 
     price = snapshot.price
+    simulated = _simulated_prices(snapshot)
+    if simulated:
+        st.warning("模擬資料／Synthetic：以下價格與價量觀察僅供測試，不是真實行情。")
     currency = "TWD" if snapshot.symbol.market.value in {"TWSE", "TPEX"} else "USD"
     columns = st.columns(2)
     _wrapped_value(
         columns[0],
-        "最新可用收盤價",
+        "模擬收盤價（測試資料）" if simulated else "最新可用收盤價",
         format_currency(price.latest_close, currency=currency) if price else "資料不足",
     )
     _wrapped_value(
@@ -87,18 +91,25 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
     for notice in snapshot.source_metadata.warnings:
         if notice.startswith("收盤研究："):
             st.info(notice)
+    _render_focus(st, snapshot, business=business)
     if snapshot.composite_score is None and snapshot.available_score is not None:
         st.write(
             f"可用項目評分：{snapshot.available_score:.1f} 分；"
             f"評分項目覆蓋率 {format_percentage(snapshot.score_coverage, is_ratio=True)}。"
             "僅按已具備項目換算，並非完整總分；分項見「評分解釋」。"
         )
+    elif snapshot.price is not None and snapshot.composite_score is not None:
+        st.caption(
+            f"既有指標模型：{snapshot.composite_score:.1f} 分；不代表公司證據完整，"
+            "分項依據見「評分解釋」。"
+        )
     question = (
         dossier.questions[0]
         if dossier is not None and dossier.questions
         else "先補齊可核對的公司官方文件與資料日期。"
     )
-    st.markdown("**接下來先確認（待查，非已確認事實）**\n\n" + question)
+    st.markdown("**優先待查｜接下來先確認（待查，非已確認事實）**\n\n" + question)
+    _render_focus_sources(st, snapshot)
     gaps = _visible_gaps(snapshot)
     # Keep material gaps visible once; the full repeated technical text belongs below.
     additional_gaps = _visible_gaps(snapshot, exclude_text=status_zh, compact=True)
@@ -129,7 +140,11 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
         if explanations and dossier is not None:
             st.write(explanations[0].text)
             for index in dict.fromkeys(explanations[0].evidence_indices):
-                st.link_button("核對業務來源", dossier.facts[index].url)
+                fact = dossier.facts[index]
+                st.caption(
+                    f"公司原文發布：{fact.published_at or '日期未知'}；取得：{fact.fetched_at}。"
+                )
+                st.link_button("核對業務來源", fact.url)
         columns = st.columns(2)
         columns[0].metric(
             "指標模型分數",
@@ -156,6 +171,89 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
         )
         for risk in snapshot.principal_risks:
             st.write(f"• {risk}")
+
+
+def _simulated_prices(snapshot: ResearchSnapshot) -> bool:
+    """Keep sample provenance visible even if a different source label was cached."""
+    labels = [snapshot.source_metadata.provider, snapshot.source_metadata.source_type]
+    frame = snapshot.price_history
+    if frame is not None and "provider" in frame:
+        labels.extend(frame.provider.dropna().unique())
+    return snapshot.symbol.code.startswith("SYNTH_") or any(
+        any(marker in str(label).lower() for marker in ("synthetic", "sample", "模擬", "範例"))
+        for label in labels
+    )
+
+
+def _render_focus(st: Any, snapshot: ResearchSnapshot, *, business: str) -> None:
+    """Arrange existing findings; no new score, prediction or company inference."""
+    st.markdown("#### 目前觀察")
+    st.markdown("**這家公司做什麼**　" + business)
+    result = observe_breakout(snapshot)
+    st.write(f"突破觀察：{result.status}｜觀測日：{result.date or '未確認'}")
+    if result.reference is not None and result.distance is not None:
+        st.write(
+            f"前20日高點 {result.reference:,.2f}；收盤相距 {result.distance:+.2%}；"
+            f"當日量／此前20日均量 {result.volume_ratio:.2f} 倍。"
+        )
+    else:
+        # A pattern gap must not suppress otherwise available close/SMA/volume.
+        for text in observation_summary(snapshot)[:2]:
+            st.write(text)
+        if result.reason:
+            st.caption("突破判讀缺口：" + result.reason)
+
+    st.markdown("#### 支持與反向證據")
+    st.caption("只核對既有突破條件；不是看多／看空評級，缺資料也不是反向證據。")
+    supports = [
+        c for c in result.conditions if c.startswith(("量能 達標", "收盤 高於", "SMA20 向上"))
+    ]
+    counters = [
+        c for c in result.conditions if c.startswith(("量能 未達標", "收盤 未高於", "SMA20 未向上"))
+    ]
+    left, right = st.columns(2)
+    for column, heading, items in (
+        (left, "已符合的條件", supports),
+        (right, "尚未符合的條件", counters),
+    ):
+        text = "\n\n".join("• " + item for item in items)
+        if not text:
+            text = "尚無可判讀證據。" if result.reason else "本次沒有此類條件。"
+        column.markdown(f"**{heading}**\n\n{text}")
+    if snapshot.price is not None and snapshot.weaknesses:
+        st.write("既有評分提醒（非新增判斷）：" + snapshot.weaknesses[0])
+
+
+def _render_focus_sources(st: Any, snapshot: ResearchSnapshot) -> None:
+    """Retain original evidence dates separately after the three reading priorities."""
+    st.caption(
+        f"價量依據：{snapshot.symbol.canonical}／{snapshot.source_metadata.provider or '來源未確認'}；"
+        f"完成日線截至 {snapshot.price.last_data_date if snapshot.price else '未確認'}；"
+        f"取得：{snapshot.source_metadata.fetched_at or '未確認'}。詳細價量與來源見總覽／證據頁籤。"
+    )
+    profile = snapshot.company_profile
+    dossier = profile.dossier if profile else None
+    if dossier is not None and (dossier.symbol, dossier.market) == (
+        snapshot.symbol.code,
+        snapshot.symbol.market.value,
+    ):
+        facts = [f for f in dossier.facts if f.section == "公司揭露的風險"]
+        if facts:
+            fact = facts[0]
+            st.write("公司風險原文（需核對是否仍適用）：" + fact.statement)
+            st.caption(f"發布：{fact.published_at or '日期未知'}；取得：{fact.fetched_at}。")
+            st.link_button("核對這項風險來源", fact.url)
+        explanations = explain_company(dossier)
+        if explanations and explanations[0].evidence_indices:
+            used = [dossier.facts[i] for i in explanations[0].evidence_indices]
+            dates = "、".join(dict.fromkeys(f.published_at or "日期未知" for f in used))
+            fetched = "、".join(
+                dict.fromkeys(f.fetched_at.split("T", 1)[0] or "未確認" for f in used)
+            )
+            st.caption(
+                f"公司業務證據發布日：{dates}；原文取得日（依來源時間）：{fetched}。"
+                "與行情日期分開；完整時間及原文見下方「核對來源」。"
+            )
 
 
 def _visible_gaps(
