@@ -66,7 +66,13 @@ def test_price_acquisition_time_reaches_snapshot(monkeypatch):
     original = _ready_snapshot()
     st = DashboardFake()
     st.session_state.update(
-        price_data=original.price_history.assign(market=original.symbol.market.value),
+        price_data=original.price_history.assign(
+            market=original.symbol.market.value,
+            provider="fixture",
+            provider_symbol=original.symbol.code + ".TW",
+            source_type="online",
+            fetched_at="2026-10-13T12:00:00Z",
+        ),
         technical_indicators=original.indicators,
         fundamental_scores=original.fundamental_results,
         backtest_result=None,
@@ -85,3 +91,50 @@ def test_price_acquisition_time_reaches_snapshot(monkeypatch):
     assert result.source_metadata.fetched_at == "2026-10-13T12:00:00Z"
     assert result.updated_at == result.source_metadata.fetched_at
     assert result.price is not None
+
+
+def test_reopened_research_uses_identity_row_provenance_not_session(monkeypatch):
+    import pandas as pd
+    from stock_tool.dashboard import app
+    from test_dashboard import _FakeStreamlit as DashboardFake
+    from test_research_workspace import _ready_snapshot
+
+    original = _ready_snapshot()
+    prices = original.price_history.assign(
+        market=original.symbol.market.value,
+        provider="yfinance",
+        provider_symbol=original.symbol.code + ".TW",
+        source_type="線上來源",
+        fetched_at="2026-10-13T12:00:00Z",
+    )
+    other = prices.assign(symbol="6669", provider="other", provider_symbol="6669.TW")
+    st = DashboardFake()
+    st.session_state.update(
+        price_data=pd.concat([prices, other], ignore_index=True),
+        fundamental_scores=None,
+        backtest_result=None,
+        price_data_source={
+            "provider": "sqlite",
+            "query_symbol": "6669.TW",
+            "source_type": "SQLite 匯入資料",
+            "updated_at": "2099-01-01",
+        },
+        dashboard_status="ready",
+    )
+    before = st.session_state.price_data.copy(deep=True)
+    monkeypatch.setattr(app, "_get_company_research_profile", lambda *args: None)
+    result = app._build_research_snapshot(
+        st, symbol=original.symbol.code, market=original.symbol.market.value
+    )
+    assert result.source_metadata.provider == "yfinance"
+    assert result.source_metadata.query_symbol == original.symbol.code + ".TW"
+    assert result.source_metadata.fetched_at == "2026-10-13T12:00:00Z"
+    pd.testing.assert_frame_equal(before, st.session_state.price_data)
+    st.session_state.price_data.loc[
+        st.session_state.price_data.symbol.eq(original.symbol.code), "provider"
+    ] = None
+    missing = app._build_research_snapshot(
+        st, symbol=original.symbol.code, market=original.symbol.market.value
+    )
+    assert missing.source_metadata.provider is None
+    assert missing.price.latest_close == result.price.latest_close

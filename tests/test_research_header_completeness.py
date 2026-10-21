@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pandas as pd
 
 from stock_tool.application.research_snapshot import (
@@ -161,6 +163,22 @@ def _snapshot(
 
 def _visible(fake: _FakeStreamlit) -> str:
     return "\n".join(str(value) for _, value in fake.events)
+
+
+def test_quote_provenance_visible_before_details_without_claiming_exchange_freshness():
+    original = _snapshot()
+    for provider in ("yfinance", "synthetic", None):
+        snapshot = replace(
+            original, source_metadata=replace(original.source_metadata, provider=provider)
+        )
+        fake = _FakeStreamlit()
+        render_research_header(fake, snapshot)
+        first_details = next(i for i, event in enumerate(fake.events) if event[0] == "expander")
+        visible = "\n".join(str(value) for _, value in fake.events[:first_details])
+        assert f"行情來源：{provider or '未確認'}" in visible
+        assert "可能落後交易所" in visible
+        assert ("Yahoo Close" in visible) == (provider == "yfinance")
+        assert snapshot.price == original.price
 
 
 def _status(fake: _FakeStreamlit) -> str:

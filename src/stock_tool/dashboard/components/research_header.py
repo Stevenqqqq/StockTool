@@ -75,6 +75,15 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
         "最後資料日期",
         format_iso_datetime(price.last_data_date) if price else "資料不足",
     )
+    st.caption(
+        f"行情來源：{snapshot.source_metadata.provider or '未確認'}；"
+        "以上為已載入的最新有效日線，可能落後交易所；不是即時報價。"
+    )
+    if snapshot.source_metadata.provider == "yfinance":
+        st.caption(
+            "使用 Yahoo Close／OHLC 與成交量，不使用 Adj Close 計算此處價量指標。"
+            "歷史價格可能已由來源調整分割，量能口徑未必等同交易所總成交量；不混接其他來源。"
+        )
     for notice in snapshot.source_metadata.warnings:
         if notice.startswith("收盤研究："):
             st.info(notice)

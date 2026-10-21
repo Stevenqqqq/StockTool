@@ -3719,11 +3719,12 @@ def _build_research_snapshot(st: Any, *, symbol: str, market: str) -> Any:
     prices = _filter_symbol_market(st.session_state.price_data, display_symbol, canonical_market)
     from stock_tool.application.completed_daily_prices import completed_daily_prices
 
-    source = st.session_state.price_data_source or {}
+    # The filtered rows establish market + symbol before the completion gate.
+    # Session metadata is global and has no binding to this batch, even when
+    # its identity happens to match. Only row acquisition times may qualify it.
     prices, completion_notices = completed_daily_prices(
         prices,
         market=canonical_market,
-        fetched_at=source.get("fetched_at"),
     )
     # Recompute from the exact completed-bar view; cached indicators may include
     # an intraday tail or a previous security. Keep the original session untouched.
@@ -3752,19 +3753,31 @@ def _build_research_snapshot(st: Any, *, symbol: str, market: str) -> Any:
             indicators if not indicators.empty else None,
             symbol=display_symbol,
         )
-    source = st.session_state.price_data_source or {}
+    # Per-row provenance survives persistence and belongs to this identity.
+    # Missing columns and null values remain unknown; never borrow session
+    # values (including updated_at or warnings) from a different price batch.
+    source: dict[str, str | None] = {}
+    if not prices.empty:
+        latest = prices.sort_values("date", kind="stable").iloc[-1]
+        for column, key in (
+            ("provider", "provider"),
+            ("provider_symbol", "query_symbol"),
+            ("source_type", "source_type"),
+            ("fetched_at", "fetched_at"),
+        ):
+            if column in prices:
+                source[key] = _optional_text(latest[column]) if pd.notna(latest[column]) else None
     source_metadata = ResearchSourceMetadata(
         provider=_optional_text(source.get("provider")),
-        query_symbol=_optional_text(source.get("query_symbol")) or display_symbol,
+        query_symbol=_optional_text(source.get("query_symbol")),
         market=canonical_market,
         source_type=_research_source_type(source.get("source_type")),
-        fetched_at=_optional_text(source.get("fetched_at"))
-        or _optional_text(source.get("updated_at")),
+        fetched_at=_optional_text(source.get("fetched_at")),
         last_data_date=(
             str(prices["date"].max()) if not prices.empty and "date" in prices else None
         ),
         row_count=len(prices),
-        warnings=tuple(source.get("warnings") or ()) + completion_notices,
+        warnings=completion_notices,
         limitations=("資料來源類型與最後資料日期依本次已載入資料顯示；不宣稱即時行情。",),
     )
     profile = _get_company_research_profile(st, display_symbol)

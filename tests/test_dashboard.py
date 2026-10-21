@@ -273,6 +273,10 @@ def test_dashboard_builds_market_qualified_research_snapshot_without_mutating_se
             "close": [104.0] * 80,
             "volume": [1000.0] * 80,
             "adjusted_close": [104.0] * 80,
+            "provider": ["fixture"] * 80,
+            "provider_symbol": ["2330.TW"] * 80,
+            "source_type": ["線上下載"] * 80,
+            "fetched_at": ["2026-10-13T12:00:00Z"] * 80,
         }
     )
     fundamentals = pd.DataFrame(

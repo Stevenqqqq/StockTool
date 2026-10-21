@@ -186,6 +186,12 @@ def render_watchlist_comparison(
             for row in rows
         )
     )
+    st.caption("以上為各來源已載入的有效收盤，可能落後交易所；同日不代表不同來源的價格基準相同。")
+    if any(row.source == "yfinance" for row in rows):
+        st.caption(
+            "Yahoo 價量使用 Close／OHLC（非 Adj Close）；歷史價格可能已調整分割，"
+            "成交量未必等同交易所總量。此處報酬不是含息總報酬。"
+        )
     with st.expander("如何閱讀與資料限制"):
         st.write(
             "紅色正值／綠色負值表示漲跌，不是買賣建議。排序只比較所選指標，沒有綜合分數。"
