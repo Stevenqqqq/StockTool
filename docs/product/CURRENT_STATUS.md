@@ -1,15 +1,17 @@
 # StockTool 目前狀態
 
-更新日期：2026-10-19。供第三方顧問閱讀已獨立驗收的原始碼；產品決定與發布核准仍由 Product Owner 負責。
+更新日期：2026-10-22。供第三方顧問閱讀已獨立驗收的原始碼；產品決定與發布核准仍由 Product Owner 負責。
 
 ## 版本與閱讀基準
 
 - GitHub：PR [#1](https://github.com/Stevenqqqq/StockTool/pull/1)，分支 `codex/sync-accepted-research-20261011`，尚未合併 main。
-- 本頁對應的最新程式提交：`c137f980cf760a986140b24e8424dd375eda69cf`；文件在後續獨立提交保存。分支最新 HEAD 請以 GitHub 或 `git rev-parse HEAD` 為準。
+- 本頁對應的最新程式提交：`fb0fa734e2284602fa10fd76ca9a57d09db9e92d`；文件在後續獨立提交保存。分支最新 HEAD 請以 GitHub 或 `git rev-parse HEAD` 為準。
 - 總覽與情境日期呈現提交：`8e3825be015e5ae063e45a449a30a15242a7c5b5`。前次同步基準：`55fb4417453a539c00c8f1db5390e6d7d6b999dd`；本次核對 main：`11ee8d7438e9a06115d3ab75a99d088d4ef55d13`。
 - 正式本機安裝參考仍為 **v1.4.3 的分項驗收狀態**。本分支的新原始碼、候選內部版本字串及候選驗收，均不代表正式安裝已更新。
-- 最新基本面／持股來源追溯：[r2 同步帳本](accepted-fundamental-holding-sync-20261015.json)。
+- 先前基本面／持股來源追溯：[r2 同步帳本](accepted-fundamental-holding-sync-20261015.json)。
 - 先前來源與驗收追溯：[本次來源帳本](accepted-source-sync-20261015.json)、[前次同步說明](accepted-source-sync-20261011.md)。歷史文件描述的是各自凍結當時的狀態。
+
+- 最新來源與獨立驗收結果：[真實行情 P1 r2 同步帳本](accepted-real-market-sync-20261022.json)。
 
 ## 目前架構與程式入口
 
@@ -52,7 +54,7 @@
 
 ## 驗證與尚存限制
 
-- 最新基本面／持股 r2 已通過 Sol 限定範圍獨立驗收：**85 targeted passed、2000 full passed、2 warnings**；獨立總覆蓋率 **83.57073121886499%**，純分支 **74.5569875151027%**。獨立驗證 CSV 雙程序身分隔離、合成週末／離線／FX 過期／缺價／衝突，以及凍結 EXE 關閉重啟。來源與候選保持凍結；不是正式安裝或真實供應商復原驗收。
+- 基本面／持股 r2 歷史候選已通過 Sol 限定範圍獨立驗收：**85 targeted passed、2000 full passed、2 warnings**；獨立總覆蓋率 **83.57073121886499%**，純分支 **74.5569875151027%**。獨立驗證 CSV 雙程序身分隔離、合成週末／離線／FX 過期／缺價／衝突，以及凍結 EXE 關閉重啟。來源與候選保持凍結；不是正式安裝或真實供應商復原驗收。
 - 這些是已驗收本機工作樹的歷史結果，包含本機另存的離線實驗測試；**不是本次精選 GitHub 分支新跑出的測試數**。本輪只做差異、來源一致性、提交內容隱私及 Git 檢查，不重跑驗收或建置 EXE。
 - Black 限制保留：本批六檔 formatter API 通過；repo CLI 指出兩份非本批測試檔需重排，另一次單 worker CLI 停滯中止，不宣稱全專案 CLI 通過。先前 CDP 首頁 H1 空的來源混載問題已另行修正並獨立驗收，不再列為目前阻擋。
 - 公司財報、營收結構、文件日期與成長欄位可能缺漏；mixed 或缺 `available_date` 的資料不能提前用於正式歷史策略。部分評分與公司證據完整性分開，不用 AI 猜補。
@@ -87,3 +89,23 @@
 - mypy缺pandas-stubs仍未通過；本批Black API／Ruff／compile通過，不宣稱全專案Black CLI通過。專門窄畫面、公司行動疑慮EXE呈現、EXE跨程序重啟及舊研究庫未新增驗證；Session State/default警告與正式安裝限制保留。
 - 公開行情只做三檔有限資料流程檢視，不是官方歷史完整性、公開行情UI或策略有效性驗收。原始CSV不在該凍結證據索引內，不隨Git同步。
 - [本批來源帳本](accepted-breakout-observation-sync-20261019.json)保存四個已驗收檔案與獨立報告雜湊。候選、runtime、原始擷取、私人資料與其他未驗收修改均排除；沒有安裝、建置、發布或合併main。
+## 真實行情端到端與來源隔離 P1 r2（2026-10-22 同步）
+
+- Sol 已獨立核對原批公開原件、正常來源 UI、比較與研究跳轉，並於 10/21 補驗解除來源隔離 P1。本次只同步已驗收 bytes；未重新查 API、跑驗收或建置 EXE。
+- 產品入口：`dashboard/app.py::_build_research_snapshot`、`dashboard/components/research_header.py`、`watchlist_comparison.py`。先按市場＋代號限定行情，再以列級取得時間執行完成日線判定；全域 session 的來源／時間／warnings 不能補資格。來源欄缺失保持未知；缺取得時間拒用價量衍生結果，但保留公司資料。舊 session-only 行情須重新載入，不靠同代號文字猜補。
+- 測試入口：`tests/test_research_provenance_isolation.py`（35項新回歸）、`test_normal_research_availability.py`、`test_research_header_completeness.py`、`test_dashboard.py`。獨立相關測試 **175 passed**，另 **23個獨立探測通過**，不是198項pytest；2 warnings為既有壞日期fixture及reviewer預先匯入造成的anyio提示。四檔Ruff、Black單worker、compile通過；不解除全repo歷史限制。
+
+初次取得約台北2026-10-20 00:42–00:46，三股均為 **TWSE／TWD、2026-10-16有效日線**。使用yfinance的Yahoo Close／OHLCV，非Adj Close。以下是當次凍結結果，不是現在報價：
+
+|標的|收盤|5／20筆報酬|量／此前20筆均量|突破觀察|
+|---|---:|---|---:|---|
+|3006 晶豪科|244.50|-8.43%／-7.39%|0.89|未突破；前20日高296.50|
+|6669 緯穎|1845.00|-17.63%／-20.30%|3.51|未突破；前20日高2345.00|
+|6933 AMAX-KY（官方公司全名艾瑪斯科技控股股份有限公司）|451.50|+18.19%／+57.87%|0.85|價格突破432.00，確認條件未齊|
+
+- 核對來源：Yahoo Finance chart公開回應（`query1.finance.yahoo.com/v8/finance/chart/{代號}.TW`，3mo／1d），以及TWSE [3006 STOCK_DAY](https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=20261001&stockNo=3006)、[6669](https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=20261001&stockNo=6669)、[6933](https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=20261001&stockNo=6933)。只作驗證，未新增產品provider；原始回應不隨Git上傳。
+- 通過範圍：每股App與Yahoo有62筆有效重疊OHLCV一致；與TWSE十月共同11日的OHLC一致。5／20筆報酬、SMA20／60相對位置、排除當日的20筆均量及最新突破條件重算一致。較短Yahoo原件不能證明完整歷史事件清單或暖機等價。
+- **成交量口徑尚未核明**：每股11日均與TWSE不同（共33筆），未猜原因、換算或混接。10/16 Yahoo／TWSE股數分別為3006：7,928,392／8,046,666；6669：12,287,772／13,858,059；6933：2,023,918／2,066,435。量比僅證明與Yahoo輸入一致，沒有交易所總成交量等價性結論。
+- **行情延遲限制**：當次Yahoo 10/19 close為null，產品保留10/16有效日線；TWSE已有10/19收盤239／1885／406.5。不能宣稱產品取得交易所最新收盤。後續Sol正常UI取得10/20資料（3006：231.50、6669：1925.00、6933：396.00），驗過搜尋、比較、缺漏恢復及研究跳轉，但這批新價格未另核官方，不能併入10/16核對。
+- 分割／公司行動：Yahoo歷史OHLC可能已經來源調整；6669的Yahoo split事件不等於官方完整coverage。同來源同日期不保證完整歷史價格基準。公司揭露缺口、HTTP406／逾時、舊搜尋草稿與SQLite載入層文字等已列限制保留。
+- 本批是來源與有限流程驗收。沒有新的full pytest／coverage、新EXE／安裝生命週期驗收；正式安裝仍為v1.4.3分項狀態。**Scenario Research合成流程已驗收，真實資料資格仍incomplete／正式研究NO-GO**，沒有三股策略有效性結論。未驗正式資料前後逐檔零變更。
