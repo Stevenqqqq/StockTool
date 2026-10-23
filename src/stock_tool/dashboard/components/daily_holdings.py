@@ -7,6 +7,7 @@ from typing import Any
 
 from stock_tool.application.daily_holdings import (
     load_report,
+    holding_close_is_completed,
     next_observation,
     positions_fingerprint,
     save_observation,
@@ -34,6 +35,14 @@ def render_daily_holdings(st: Any, paths: RuntimePaths) -> HomeAction | None:
         return None
     if report and report["positions_fingerprint"] != positions_fingerprint(positions):
         st.info("持股已變更，舊部位的摘要暫不套用；正在準備新結果。")
+        report = None
+    if report and not all(
+        holding_close_is_completed(row, now=datetime.now(UTC))
+        for row in report["holdings"].values()
+    ):
+        st.warning(
+            "前次持股摘要含未確認完成的日線，暫不顯示舊估值與訊號；請重新檢查持股。原檔保留。"
+        )
         report = None
     job = start_refresh(paths)
     if job.error:

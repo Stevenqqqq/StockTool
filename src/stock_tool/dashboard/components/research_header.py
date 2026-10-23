@@ -20,7 +20,7 @@ from stock_tool.application.breakout_observation import observe_breakout
 from stock_tool.dashboard.components.price_volume_observation import observation_summary
 
 
-def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
+def render_research_header(st: Any, snapshot: ResearchSnapshot, *, compact: bool = False) -> None:
     """Render identity, separated model coverage, and company-data status.
 
     The score model and the company dossier answer different questions.  Keep
@@ -56,12 +56,6 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
     ):
         dossier = None
     explanations = explain_company(dossier) if dossier is not None else ()
-    if explanations:
-        # Use existing explanation sentences verbatim, never a new model/inference.
-        sentences = explanations[0].text.split("。")
-        business = sentences[0].rstrip("。") + "。"
-    else:
-        business = "公司業務證據尚不足，不能只靠名稱或產業猜測。"
 
     price = snapshot.price
     simulated = _simulated_prices(snapshot)
@@ -79,48 +73,46 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
         "最後資料日期",
         format_iso_datetime(price.last_data_date) if price else "資料不足",
     )
-    st.caption(
+    st.write(
         f"行情來源：{snapshot.source_metadata.provider or '未確認'}；"
         "以上為已載入的最新有效日線，可能落後交易所；不是即時報價。"
+        f"取得：{snapshot.source_metadata.fetched_at or '未確認'}。"
     )
     if snapshot.source_metadata.provider == "yfinance":
-        st.caption(
-            "使用 Yahoo Close／OHLC 與成交量，不使用 Adj Close 計算此處價量指標。"
-            "歷史價格可能已由來源調整分割，量能口徑未必等同交易所總成交量；不混接其他來源。"
+        st.write(
+            "Yahoo Close／OHLC（非 Adj Close）；量能口徑未必等同交易所總成交量。"
+            + (
+                "調整口徑詳見下方核對來源。"
+                if compact
+                else "歷史價格可能已由來源調整分割；不混接其他來源。"
+            )
         )
     for notice in snapshot.source_metadata.warnings:
         if notice.startswith("收盤研究："):
-            st.info(notice)
-    _render_focus(st, snapshot, business=business)
-    if snapshot.composite_score is None and snapshot.available_score is not None:
-        st.write(
-            f"可用項目評分：{snapshot.available_score:.1f} 分；"
-            f"評分項目覆蓋率 {format_percentage(snapshot.score_coverage, is_ratio=True)}。"
-            "僅按已具備項目換算，並非完整總分；分項見「評分解釋」。"
-        )
-    elif snapshot.price is not None and snapshot.composite_score is not None:
-        st.caption(
-            f"既有指標模型：{snapshot.composite_score:.1f} 分；不代表公司證據完整，"
-            "分項依據見「評分解釋」。"
-        )
-    question = (
-        dossier.questions[0]
-        if dossier is not None and dossier.questions
-        else "先補齊可核對的公司官方文件與資料日期。"
-    )
-    st.markdown("**優先待查｜接下來先確認（待查，非已確認事實）**\n\n" + question)
-    _render_focus_sources(st, snapshot)
+            st.info(
+                notice.split("。當日行情", 1)[0] + "。完整說明見核對來源。" if compact else notice
+            )
+    if not compact:
+        render_research_focus(st, snapshot)
     gaps = _visible_gaps(snapshot)
     # Keep material gaps visible once; the full repeated technical text belongs below.
     additional_gaps = _visible_gaps(snapshot, exclude_text=status_zh, compact=True)
     if additional_gaps:
-        st.caption("待補資料：" + "；".join(additional_gaps))
+        st.write("待補資料：" + "；".join(additional_gaps))
     if gaps:
         st.caption(
             "補救方式：公司內容可按「重新讀取公司資料」；評分缺項請到「評分解釋」核對所需欄位。"
         )
 
     with st.expander("核對來源、完整限制與指標分數"):
+        if snapshot.source_metadata.provider == "yfinance":
+            st.write(
+                "使用 Yahoo Close／OHLC 與成交量，不使用 Adj Close 計算此處價量指標。"
+                "歷史價格可能已由來源調整分割，量能口徑未必等同交易所總成交量；不混接其他來源。"
+            )
+        for source_warning in snapshot.source_metadata.warnings:
+            if source_warning.startswith("收盤研究："):
+                st.info(source_warning)
         for gap in gaps:
             st.write(f"• {gap}")
         directory = current_names.get()
@@ -171,6 +163,42 @@ def render_research_header(st: Any, snapshot: ResearchSnapshot) -> None:
         )
         for risk in snapshot.principal_risks:
             st.write(f"• {risk}")
+
+
+def render_research_focus(st: Any, snapshot: ResearchSnapshot) -> None:
+    """Keep the existing findings in Overview, rather than above every tab."""
+    profile = snapshot.company_profile
+    dossier = profile.dossier if profile else None
+    if dossier is not None and (dossier.symbol, dossier.market) != (
+        snapshot.symbol.code,
+        snapshot.symbol.market.value,
+    ):
+        dossier = None
+    explanations = explain_company(dossier) if dossier is not None else ()
+    if explanations:
+        # Two existing sentences preserve the plain-language product explanation.
+        business = "。".join(explanations[0].text.split("。")[:2]).rstrip("。") + "。"
+    else:
+        business = "公司業務證據尚不足，不能只靠名稱或產業猜測。"
+    _render_focus(st, snapshot, business=business)
+    if snapshot.composite_score is None and snapshot.available_score is not None:
+        st.write(
+            f"可用項目評分：{snapshot.available_score:.1f} 分；"
+            f"評分項目覆蓋率 {format_percentage(snapshot.score_coverage, is_ratio=True)}。"
+            "僅按已具備項目換算，並非完整總分；分項見「評分解釋」。"
+        )
+    elif snapshot.price is not None and snapshot.composite_score is not None:
+        st.caption(
+            f"既有指標模型：{snapshot.composite_score:.1f} 分；不代表公司證據完整，"
+            "分項依據見「評分解釋」。"
+        )
+    question = (
+        dossier.questions[0]
+        if dossier is not None and dossier.questions
+        else "先補齊可核對的公司官方文件與資料日期。"
+    )
+    st.markdown("**優先待查｜接下來先確認（待查，非已確認事實）**\n\n" + question)
+    _render_focus_sources(st, snapshot)
 
 
 def _simulated_prices(snapshot: ResearchSnapshot) -> bool:
@@ -226,7 +254,7 @@ def _render_focus(st: Any, snapshot: ResearchSnapshot, *, business: str) -> None
 
 def _render_focus_sources(st: Any, snapshot: ResearchSnapshot) -> None:
     """Retain original evidence dates separately after the three reading priorities."""
-    st.caption(
+    st.write(
         f"價量依據：{snapshot.symbol.canonical}／{snapshot.source_metadata.provider or '來源未確認'}；"
         f"完成日線截至 {snapshot.price.last_data_date if snapshot.price else '未確認'}；"
         f"取得：{snapshot.source_metadata.fetched_at or '未確認'}。詳細價量與來源見總覽／證據頁籤。"
@@ -241,7 +269,7 @@ def _render_focus_sources(st: Any, snapshot: ResearchSnapshot) -> None:
         if facts:
             fact = facts[0]
             st.write("公司風險原文（需核對是否仍適用）：" + fact.statement)
-            st.caption(f"發布：{fact.published_at or '日期未知'}；取得：{fact.fetched_at}。")
+            st.write(f"發布：{fact.published_at or '日期未知'}；取得：{fact.fetched_at}。")
             st.link_button("核對這項風險來源", fact.url)
         explanations = explain_company(dossier)
         if explanations and explanations[0].evidence_indices:
@@ -250,7 +278,7 @@ def _render_focus_sources(st: Any, snapshot: ResearchSnapshot) -> None:
             fetched = "、".join(
                 dict.fromkeys(f.fetched_at.split("T", 1)[0] or "未確認" for f in used)
             )
-            st.caption(
+            st.write(
                 f"公司業務證據發布日：{dates}；原文取得日（依來源時間）：{fetched}。"
                 "與行情日期分開；完整時間及原文見下方「核對來源」。"
             )

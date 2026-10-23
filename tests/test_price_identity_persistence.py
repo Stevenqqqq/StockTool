@@ -55,6 +55,7 @@ def _market_qualified_prices() -> pd.DataFrame:
                     "source_type": "cache",
                     "last_data_date": "2024-01-03",
                     "checked_at": "2024-01-12T08:00:00+00:00",
+                    "fetched_at": "2024-01-12T08:00:00+00:00",
                 }
             )
     return pd.DataFrame(rows)

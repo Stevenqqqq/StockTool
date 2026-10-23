@@ -16,7 +16,10 @@ from stock_tool.dashboard.components.research_chart import (
     build_research_chart,
     render_research_chart,
 )
-from stock_tool.dashboard.components.research_header import render_research_header
+from stock_tool.dashboard.components.research_header import (
+    render_research_header,
+    render_research_focus,
+)
 from stock_tool.dashboard.components.price_volume_observation import render_price_volume_observation
 from stock_tool.dashboard.components.risk_summary import render_risk_summary
 from stock_tool.dashboard.components.scorecard import render_scorecard
@@ -38,14 +41,13 @@ def render_research_workspace(
     library: ResearchLibrary | None = None,
     ai_cache_directory: Path | None = None,
     on_handoff: Callable[[str, ResearchSnapshot], None] | None = None,
+    on_compare: Callable[[], None] | None = None,
 ) -> SearchPreparation | None:
     """Render a focused workspace without recalculating snapshot data in the UI."""
 
-    render_research_header(st, snapshot)
-    paths = default_runtime_paths()
-    library = library or ResearchLibrary(paths.research_library_dir)
-    library_service = ResearchLibraryApplicationService(library)
-    bundle = build_evidence_bundle(snapshot)
+    if on_compare is not None and st.button("自選股比較", key="research_open_comparison"):
+        on_compare()
+        return None
     with st.expander("研究其他股票", expanded=False):
         preparation = render_global_search(
             st,
@@ -54,10 +56,16 @@ def render_research_workspace(
             default_market=snapshot.symbol.market.value,
         )
 
+    render_research_header(st, snapshot, compact=True)
+    paths = default_runtime_paths()
+    library = library or ResearchLibrary(paths.research_library_dir)
+    library_service = ResearchLibraryApplicationService(library)
+    bundle = build_evidence_bundle(snapshot)
     overview, chart_tab, fundamentals, scoring, evidence, risk = st.tabs(
         ("總覽", "圖表", "基本面", "評分解釋", "證據與資料", "風險與情境")
     )
     with overview:
+        render_research_focus(st, snapshot)
         _render_overview_chart(st, snapshot)
         _render_company_overview(st, snapshot, compact=True)
         render_risk_summary(st, snapshot)

@@ -27,6 +27,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 
+from stock_tool.application.completed_daily_prices import completed_market_prices
 from stock_tool.application.daily_brief import DailyBriefService, ResearchContinuation
 from stock_tool.application.daily_research_brief import (
     DailyResearchBrief,
@@ -1458,7 +1459,7 @@ class HeadlessDailyResearchRunner:
             )
 
         stage_trace.enter("brief")
-        prices, source_map = _load_price_context(self.paths)
+        prices, source_map = _load_price_context(self.paths, now=self.now_fn())
         input_hash = _input_snapshot_hash(
             identities, self.paths, prices=prices, market_result=market_result
         )
@@ -1531,7 +1532,13 @@ class HeadlessDailyResearchRunner:
                         provider="local",
                         source_type="cache",
                         provider_symbol=None,
-                        last_data_date=str(value)[:10] if value else None,
+                        last_data_date=pd.Timestamp(
+                            prices.loc[
+                                prices["market"] + ":" + prices["symbol"] == key, "date"
+                            ].max()
+                        )
+                        .date()
+                        .isoformat(),
                         checked_at=value,
                     )
                     for key, value in source_map.items()
@@ -2052,7 +2059,7 @@ def _publish_daily_holdings(
     )
     from stock_tool.portfolio_valuation import Currency
 
-    prices_for_holdings, _ = _load_price_context(paths)
+    prices_for_holdings, _ = _load_price_context(paths, now=now_fn())
     fx_cache = JsonFxQuoteCache(paths.cache_dir / "usd_twd_fx.json", now=now_fn)
     fx_quote = fx_cache.get_quote(Currency.USD, Currency.TWD)
     if "USD" in portfolio.get("currency", pd.Series(dtype=str)).values and fetch_fx:
@@ -2079,16 +2086,21 @@ def _publish_daily_holdings(
     )
 
 
-def _load_price_context(paths: RuntimePaths) -> tuple[pd.DataFrame, dict[str, str]]:
+def _load_price_context(
+    paths: RuntimePaths, *, now: datetime | None = None
+) -> tuple[pd.DataFrame, dict[str, str]]:
     storage = SQLitePriceStorage(paths.processed_dir / "stock_data.sqlite")
     if not storage.price_identity_sidecar_path.is_file():
         return pd.DataFrame(columns=["symbol", "market", "date", "close", "volume"]), {}
     context = storage.load_market_qualified_price_context()
     if context.warnings or not context.records:
         return pd.DataFrame(columns=["symbol", "market", "date", "close", "volume"]), {}
-    frame = pd.DataFrame(list(context.records))
+    frame = completed_market_prices(pd.DataFrame(list(context.records)), now=now)
+    available = set(frame["market"] + ":" + frame["symbol"])
     checked = {
-        item.symbol.canonical: item.checked_at for item in context.provenance if item.checked_at
+        item.symbol.canonical: item.checked_at
+        for item in context.provenance
+        if item.checked_at and item.symbol.canonical in available
     }
     return frame, checked
 

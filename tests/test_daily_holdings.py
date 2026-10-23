@@ -364,7 +364,7 @@ def test_slow_refresh_validates_at_completion_not_start(tmp_path, monkeypatch):
     paths, positions = inputs(tmp_path)
     completed = NOW + timedelta(minutes=10)
     JsonFxQuoteCache(paths.cache_dir / "usd_twd_fx.json").save(quote(completed))
-    monkeypatch.setattr(scheduler, "_load_price_context", lambda _: (prices(completed), {}))
+    monkeypatch.setattr(scheduler, "_load_price_context", lambda _, **_kw: (prices(completed), {}))
     scheduler._publish_daily_holdings(
         paths,
         positions,

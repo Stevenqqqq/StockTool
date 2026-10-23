@@ -558,10 +558,18 @@ def _render_research_with_handoff(st: Any, snapshot: Any) -> Any:
     return render_research_workspace(
         st,
         snapshot,
+        on_compare=lambda: _open_research_comparison(st),
         on_handoff=lambda destination, current: _route_research_workspace_handoff(
             st, destination, current
         ),
     )
+
+
+def _open_research_comparison(st: Any) -> None:
+    """Open the existing watchlist; never add a symbol or refresh its prices."""
+    st.session_state["research_comparison_focus"] = True
+    navigate_to_workspace(st.session_state, workspace="explore", legacy_page="自選股清單")
+    st.rerun()
 
 
 def _render_daily_refresh_result(st: Any) -> None:
@@ -629,6 +637,16 @@ def _render_workspace(
             st.warning(handoff_error)
             return
     if item.key == "explore":
+        if st.session_state.get("research_comparison_focus", False):
+            # Focus the existing tool, not the unrelated market/concept overview.
+            st.session_state["dashboard_pending_workspace_destination"] = None
+            if st.button("返回探索", key="watchlist_back_to_explore"):
+                st.session_state["research_comparison_focus"] = False
+                st.session_state["workspace_explore_secondary_navigation"] = "工作區總覽"
+                st.rerun()
+                return
+            _render_legacy_page_safely(st, dependencies, "自選股清單")
+            return
         concept_path = dependencies.concept_path or (Path("data") / "sample" / "concept_stocks.csv")
         service = ExploreApplicationService(
             concept_path=concept_path,

@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from stock_tool.application.completed_daily_prices import completed_daily_prices
 from stock_tool.application.daily_brief import DailyBriefService
 from stock_tool.application.daily_research_loop import (
     DailyResearchLoopService,
@@ -57,6 +58,18 @@ def positions_fingerprint(positions: pd.DataFrame) -> str:
 
 def report_path(paths: RuntimePaths) -> Path:
     return paths.data_dir / "daily_holdings_v1.json"
+
+
+def holding_close_is_completed(row: dict[str, Any], *, now: datetime) -> bool:
+    """Do not trust a pre-fix saved close merely because its file hash is valid."""
+    quotes = [datum for datum in row.get("data", []) if datum.get("label") == "收盤價"]
+    if not quotes:
+        return True  # An unavailable holding without a quoted close stays visible.
+    frame = pd.DataFrame(
+        {"date": datum.get("as_of"), "fetched_at": datum.get("fetched_at")} for datum in quotes
+    )
+    completed, _ = completed_daily_prices(frame, market=row["market"], now=now)
+    return len(completed) == len(frame)
 
 
 def load_report(paths: RuntimePaths) -> dict[str, Any] | None:
@@ -145,6 +158,8 @@ def publish_holdings(
             profile = {}
         kind = profile.get("instrument_type", "未確認")
         prior = (previous or {}).get("holdings", {}).get(identity)
+        if prior and not holding_close_is_completed(prior, now=now):
+            prior = None  # Never compare a completed close against a saved intraday baseline.
         if prior and prior["instrument_type"] != kind:
             prior = None  # Never compare across an instrument-type correction.
         holding = build_holding_analysis(

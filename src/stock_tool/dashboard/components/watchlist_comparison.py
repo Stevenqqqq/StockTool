@@ -178,8 +178,8 @@ def render_watchlist_comparison(
         if result and "失敗" in result:
             st.caption(f"{label(row.symbol.canonical)}：{result}")
         if row.notices:
-            st.caption(f"{label(row.symbol.canonical)}：" + "；".join(row.notices))
-    st.caption(
+            st.write(f"{label(row.symbol.canonical)}：" + "；".join(row.notices))
+    st.write(
         "資料狀態："
         + " ｜ ".join(
             f"{row.symbol.code} {row.date or '日期未確認'} · {row.source or '來源未確認'}"

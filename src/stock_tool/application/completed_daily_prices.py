@@ -64,3 +64,18 @@ def completed_daily_prices(
             "缺取得時間的資料請重新載入。",
         )
     return result, notices
+
+
+def completed_market_prices(prices: pd.DataFrame, *, now: datetime | None = None) -> pd.DataFrame:
+    """Apply the same boundary to explicit markets, using only row acquisition times.
+
+    Runtime consumers receive a derived copy, never a repaired raw cache. Missing
+    market identity or acquisition provenance cannot borrow a check/read time.
+    """
+    if "market" not in prices.columns or prices.empty:
+        return prices.iloc[:0].copy(deep=True)
+    parts = [
+        completed_daily_prices(group, market=str(market), now=now)[0]
+        for market, group in prices.groupby("market", sort=False, dropna=False)
+    ]
+    return pd.concat(parts, ignore_index=True)

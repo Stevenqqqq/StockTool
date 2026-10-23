@@ -43,6 +43,7 @@ if not getattr(sys, "frozen", False):
         raise RuntimeError("StockTool source import conflict: unexpected package origin.")
 
 from stock_tool.backtest import BacktestEngine, BacktestResult
+from stock_tool.application.completed_daily_prices import completed_market_prices
 from stock_tool.application.daily_brief import (
     DailyBrief,
     DailyBriefService,
@@ -2803,9 +2804,7 @@ def _daily_research_sources(st: Any) -> dict[str, DailyResearchSource]:
             provider=_single_frame_text(group, "provider"),
             source_type=_single_frame_text(group, "source_type"),
             provider_symbol=_single_frame_text(group, "provider_symbol"),
-            last_data_date=(
-                _single_frame_text(group, "last_data_date") or _latest_frame_date(group)
-            ),
+            last_data_date=_latest_frame_date(group),
             checked_at=max(checked_values) if checked_values else None,
         )
     return sources
@@ -3025,7 +3024,7 @@ def _hydrate_daily_symbol(st: Any, symbol: Symbol) -> DailyRefreshRecord:
 
 
 def _portfolio_price_context(st: Any) -> pd.DataFrame | None:
-    """Return the widest available local price context for portfolio valuation."""
+    """Return completed local daily bars for home, daily research and valuation."""
 
     stored_prices = _load_default_database_prices(_runtime_database_path())
     if (
@@ -3037,7 +3036,15 @@ def _portfolio_price_context(st: Any) -> pd.DataFrame | None:
         # for legacy inspection, but never let valuation infer a market from them.
         stored_prices = stored_prices.copy(deep=True)
         stored_prices["market"] = "UNKNOWN"
-    return _merge_price_frames([stored_prices, _market_qualified_current_prices(st)])
+    # Filter before merge so an older intraday session cache cannot replace a
+    # completed persisted close for the same identity/day.
+    return _merge_price_frames(
+        [
+            completed_market_prices(frame)
+            for frame in (stored_prices, _market_qualified_current_prices(st))
+            if frame is not None
+        ]
+    )
 
 
 def _merge_price_frames(frames: Sequence[pd.DataFrame | None]) -> pd.DataFrame | None:

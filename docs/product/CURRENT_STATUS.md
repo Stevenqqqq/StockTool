@@ -1,17 +1,58 @@
 # StockTool 目前狀態
 
-更新日期：2026-10-22。供第三方顧問閱讀已獨立驗收的原始碼；產品決定與發布核准仍由 Product Owner 負責。
+更新日期：2026-10-23。供第三方顧問閱讀已獨立限定驗收的原始碼；產品決定與發布核准仍由 Product Owner 負責。
 
 ## 版本與閱讀基準
 
 - GitHub：PR [#1](https://github.com/Stevenqqqq/StockTool/pull/1)，分支 `codex/sync-accepted-research-20261011`，尚未合併 main。
-- 本頁對應的最新程式提交：`a75522ed618d649a8a8bb34a6701f40c55030ce5`；文件在後續獨立提交保存。分支最新 HEAD 請以 GitHub 或 `git rev-parse HEAD` 為準。
+- 最新同步為「日常使用流程改善 v1」與「完成日線一致性 P1」的已驗收產品、必要測試及本狀態文件，保存在同一提交；本頁不填入自我參照的提交 SHA，最新 HEAD 以 PR #1 或 `git rev-parse HEAD` 為準。同步前 PR HEAD：`c1aed16fbec8b05711d1ea7b904ca464533d4798`；先前研究重點程式提交：`a75522ed618d649a8a8bb34a6701f40c55030ce5`。
 - 總覽與情境日期呈現提交：`8e3825be015e5ae063e45a449a30a15242a7c5b5`。前次同步基準：`55fb4417453a539c00c8f1db5390e6d7d6b999dd`；本次核對 main：`11ee8d7438e9a06115d3ab75a99d088d4ef55d13`。
 - 正式本機安裝參考仍為 **v1.4.3 的分項驗收狀態**。本分支的新原始碼、候選內部版本字串及候選驗收，均不代表正式安裝已更新。
 - 先前基本面／持股來源追溯：[r2 同步帳本](accepted-fundamental-holding-sync-20261015.json)。
 - 先前來源與驗收追溯：[本次來源帳本](accepted-source-sync-20261015.json)、[前次同步說明](accepted-source-sync-20261011.md)。歷史文件描述的是各自凍結當時的狀態。
 
-- 最新來源與獨立驗收結果：[個股研究重點整合 v1 同步帳本](accepted-research-focus-sync-20261022.json)。先前：[真實行情 P1 r2 同步帳本](accepted-real-market-sync-20261022.json)。
+- 先前來源與獨立驗收結果：[個股研究重點整合 v1 同步帳本](accepted-research-focus-sync-20261022.json)、[真實行情 P1 r2 同步帳本](accepted-real-market-sync-20261022.json)。本次兩輪的來源與驗收邊界如下。
+
+## 最新同步：日常使用流程改善 v1＋完成日線一致性 P1
+
+Product Owner 於 2026-10-23 確認兩輪均已通過 **G4／Antigravity 獨立限定驗收**，並授權同步既有 PR #1。這不是全產品、全量品質門檻、EXE、正式安裝或發布驗收。以下區分產品範圍與原有證據，不將實作者測試數改稱 G4 的獨立測試數。
+
+### 日常使用流程改善 v1：保留的六個 UX 檔案
+
+- 研究頁改用精簡共用頁首，研究重點移至總覽；重複細節可展開，但重要缺口、過期與 Synthetic 警告不折疊隱藏。
+- 價量與自選股比較的來源／資料狀態改用較清楚的正文；換股入口移至上方，可直接進入既有比較並返回研究／探索。不新增模型、Provider、研究系統或評分。
+- 原凍結交接的正常 UI 證據涵蓋 3006→6669→6933、三檔比較、比較跳回研究、來源展開與空白查詢保留；含 1280×720 與一個 900×720 長名稱案例。Synthetic／完全缺價格主要是回歸證據，不宣稱正常瀏覽器完整旅程；未宣稱摘要全部塞入單一首屏或完成原生縮放／全部鍵盤驗證。
+- UX 凍結來源索引 SHA256：`801a7f371e839b99d8e62e2c739c328e5f4aaec144d7dc2c508ce551319529eb`。以下六檔在最新 P1 候選及本次同步中均保持 UX 驗收時的原始 bytes：
+
+| 檔案（相對 `src/stock_tool/`） | SHA256 |
+| --- | --- |
+| `dashboard/components/research_header.py` | `6607bbe33bddace0781cc179119ced968eeef7d98eed33c68ee6bf47afc15c78` |
+| `dashboard/components/price_volume_observation.py` | `e58e3b94ba4076590de9f4d0a1e761f032aa707483cb12b7801f0bfc7f9fb1a6` |
+| `dashboard/components/watchlist_comparison.py` | `a93f2e5da533d3df0931e2a74ff0f9471d0191060ffd703500c993bf23f3a0ce` |
+| `dashboard/pages/research.py` | `ecd8d4ce393a068de1785c17f45559f147df95bd6fddbaaa2fac39cf95e670ca` |
+| `dashboard/shell.py` | `f0785e34035f122c10ed635481480f7feba0c2b0da41a6a43b7004b479654b75` |
+| `dashboard/styles.py` | `cf2b6d1ba0119e1565c4f51c1a95a4f11258805af1b19a79e7723beb65fd41ae` |
+
+### 完成日線一致性 P1：修復結果
+
+- 沿用 `application/completed_daily_prices.py`，依明確市場與逐列原始 `fetched_at` 判定完成日線；不借用 `checked_at`、讀取時間或其他市場身分。未改台灣18:30／美東18:00保守門檻，盤中快取不因重讀或重啟而升格。
+- `dashboard/app.py::_portfolio_price_context` 在合併 SQLite／session 前過濾，保護首頁、手動每日研究及估值；盤中 session 不能蓋掉同市場＋代號＋日期的有效收盤。摘要來源日期使用過濾後實際行情日，不再沿用資料包的盤中日期。
+- `application/daily_research_scheduler.py::_load_price_context` 同樣保護背景每日研究與持股發布；行情日期與檢查時間分開保存。
+- `application/holding_analysis.py` 的單股分析及 `validated_holding_prices` 都使用過濾後副本，canonical valuation 不會重新吃回原始盤中價；週末／離線參考估值、FX 過期／未知拒絕、缺價與價格衝突安全規則維持。
+- `application/daily_holdings.py` 與 `dashboard/components/daily_holdings.py` 對舊保存摘要補上讀取保護：即使雜湊合法，未完成日線也不可繼續顯示為收盤估值／訊號或作比較基準；原檔保留，正常更新可形成有效新基準。
+- 最新 P1 凍結來源索引 SHA256：`0ab4b817adb26044cc2e2ee4e2317d40308cbe6804b51104951be89e6c128492`，211 檔。P1 相對 UX 基準只變更六個產品檔及 `test_dashboard.py`；六個 UX 產品檔未變。本次只同步兩輪差異及必要測試，不整包覆蓋工作樹。
+- 原實作證據：凍結候選相關測試 **259 passed**；合成正常來源首頁 AppTest 保留原始100／999兩列，摘要取前一完成日收盤100、兩股市值200，重讀一致且隔離行情／sidecar／持股輸入雜湊不變。這些數字不是本輪重跑，也不是實際 EXE／瀏覽器畫面驗收。
+
+### 品質與交付限制：未解決、未豁免
+
+- 原 P1 全量紀錄為 **2118 passed／8 failed／3 warnings，exit 1**；覆蓋率83.62%僅表示原78.50%門檻達標，不能抵銷失敗。
+- 八項在前一已凍結來源也已重現，**仍未解決，沒有取得豁免，不視為全量通過**：`test_research_document_workspace.py` 三項舊 UI fake 缺 `markdown`；`test_sprint51_research_integrity.py` 五項舊 fixture 缺可用完成日線，涉及三項來源與兩項 score／backtest 呼叫斷言。本次不修改這兩個檔案。
+- P1 修改的13檔 Black、17檔 Ruff 與 compile 自測通過；擴大 Black 時未修改的 `test_daily_research_loop.py` 尚有格式差異，mypy 缺 pandas stubs 仍未通過。沒有以限定驗收抹除這些品質限制。
+- 本輪**只做凍結檔案一致性、Git 差異與隱私檢查**；不重新開發、跑測試／驗收或建置。同步為 **12個產品檔＋8個必要測試＋本狀態文件，共21檔**，其餘未驗收修改留在本機。
+- **本輪沒有新 EXE、EXE UI 或正式安裝／生命週期驗收**。正式本機安裝仍為v1.4.3分項狀態，guest lifecycle既有豁免、空研究庫與捷徑雙擊等交付限制維持；不因來源同步提升。
+- 真實資料資格仍 **incomplete／正式 Scenario Research NO-GO**。保守完成日線判定不證明歷史交易日、公司行動或來源調整 coverage 完整；不修改原始行情、回測引擎或既有資格門檻。
+- Yahoo行情延遲、量能／價格調整口徑、部分公司資料缺漏等限制保留。既有研究庫與歷史內容不批次追溯重算；未宣稱清理所有歷史結果。
+- 不上傳本機驗收報告／截圖、機器路徑、原始擷取、runtime、快取、憑證、持股或 EXE；未安裝、發布、force push 或合併 main。歷史章節的狀態與數字只代表各批當時範圍。
 
 ## 目前架構與程式入口
 

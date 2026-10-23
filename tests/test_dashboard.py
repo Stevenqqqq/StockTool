@@ -1018,6 +1018,12 @@ def test_dashboard_portfolio_price_context_merges_sqlite_and_current_session(
             },
         ]
     )
+    # This merge test uses explicitly acquired completed bars. Legacy rows
+    # without acquisition provenance are separately required to fail closed.
+    stored = dashboard_app._load_default_database_prices(database)
+    stored["market"] = "TWSE"
+    stored["fetched_at"] = "2024-01-03T12:00:00Z"
+    dashboard_app._persist_price_data(stored, database)
     monkeypatch.setattr(dashboard_app, "DEFAULT_DATABASE", database)
     fake_st = _FakeStreamlit()
     fake_st.session_state.price_data = pd.DataFrame(
@@ -1025,6 +1031,7 @@ def test_dashboard_portfolio_price_context_merges_sqlite_and_current_session(
             "date": ["2024-01-02"],
             "symbol": ["6789"],
             "close": [543.0],
+            "fetched_at": ["2024-01-03T12:00:00Z"],
         }
     )
     fake_st.session_state.price_data_source = {"market": "TWSE"}

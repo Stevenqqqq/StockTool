@@ -358,7 +358,7 @@ def test_headless_refreshes_official_markets_once_and_reuses_same_snapshot(
     monkeypatch.setattr(
         scheduler_module,
         "_load_price_context",
-        lambda _paths: (
+        lambda _paths, **_kwargs: (
             pd.DataFrame(
                 [{"symbol": "2330", "market": "TWSE", "date": "2026-08-23", "close": 600.0}]
             ),

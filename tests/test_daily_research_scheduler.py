@@ -133,7 +133,7 @@ def _prepare_stage_fault_runner(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(
         scheduler_module,
         "_load_price_context",
-        lambda _paths: (
+        lambda _paths, **_kwargs: (
             pd.DataFrame(
                 [{"symbol": "2330", "market": "TWSE", "date": "2026-08-23", "close": 600.0}]
             ),
@@ -218,7 +218,7 @@ def test_headless_stage_exception_preserves_completed_trace(
         monkeypatch.setattr(
             scheduler_module,
             "_load_price_context",
-            lambda *_a: (_ for _ in ()).throw(RuntimeError("price")),
+            lambda *_a, **_kw: (_ for _ in ()).throw(RuntimeError("price")),
         )
     elif fault_stage == "daily_brief_build":
         monkeypatch.setattr(
@@ -322,6 +322,7 @@ def test_evidence_target_refresh_replays_preloaded_rows_without_provider(
             source_type="evidence_fixture",
             last_data_date="2026-08-23",
             checked_at="2026-08-24T10:00:00+00:00",
+            fetched_at="2026-08-24T10:00:00+00:00",
         ),
     )
     monkeypatch.setenv("STOCK_TOOL_EVIDENCE_MODE", "sprint32.1.1")
@@ -996,7 +997,7 @@ def test_corrupt_immutable_brief_history_never_mints_a_new_baseline(
     monkeypatch.setattr(scheduler_module, "load_watchlist", lambda _path: frame.iloc[0:0])
     monkeypatch.setattr(scheduler_module, "build_effective_watchlist", lambda _w, _p: frame)
     monkeypatch.setattr(
-        scheduler_module, "_load_price_context", lambda _paths: (pd.DataFrame(), {})
+        scheduler_module, "_load_price_context", lambda _paths, **_kw: (pd.DataFrame(), {})
     )
     monkeypatch.setattr(scheduler_module.DailyBriefService, "build", lambda *_a, **_k: object())
     monkeypatch.setattr(

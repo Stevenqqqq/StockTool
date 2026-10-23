@@ -151,6 +151,12 @@ p, label, small, [data-testid="stCaptionContainer"] {{
 }}
 [data-testid="stCaptionContainer"] {{ color: var(--stocktool-muted); }}
 
+/* Fragment reruns can retain a former home form after navigation. Hide only
+   that wholly stale control block, never current controls or research data. */
+.st-key-home_command_panel:has([data-stale="true"]):not(:has([data-stale="false"])) {{
+  display: none;
+}}
+
 /* StockTool workspace header: hierarchy comes from alignment and whitespace,
    not another heavy card. */
 .st-ui-workspace-header {{

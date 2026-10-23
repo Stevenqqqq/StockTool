@@ -11,7 +11,10 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from stock_tool.application.completed_daily_prices import completed_daily_prices
+from stock_tool.application.completed_daily_prices import (
+    completed_daily_prices,
+    completed_market_prices,
+)
 from stock_tool.portfolio_valuation import FxQuote
 from stock_tool.research.evidence import ClaimKind, EvidenceBundle, EvidenceRecord
 
@@ -161,7 +164,7 @@ def validated_holding_prices(
         return None
     if not {"symbol", "market", "date", "close"}.issubset(prices.columns):
         return None
-    result = prices.copy(deep=True)
+    result = completed_market_prices(prices, now=now)
     for position in positions.to_dict("records"):
         identity = f"{position['symbol']}|{position['market']}"
         profile = profiles.get(identity)
@@ -255,6 +258,25 @@ def build_holding_analysis(
         selected["_date"] = pd.to_datetime(selected["date"], errors="coerce", utc=True)
         selected = selected.dropna(subset=["_date"]).sort_values("_date")
         if not selected.empty:
+            original_latest = selected.iloc[-1]
+            if (
+                _price_reference_status(
+                    _text(original_latest.get("date")),
+                    _text(original_latest.get("fetched_at")),
+                    market,
+                    now,
+                )
+                == "日期衝突"
+            ):
+                # Retain the existing conflict refusal; do not mask corrupt
+                # chronology by quietly choosing an older valuation instead.
+                gaps.append("價格日期衝突，暫停估值；未以較舊價格掩蓋衝突。")
+                selected = selected.iloc[:0]
+        selected, completion_notices = completed_daily_prices(selected, market=market, now=now)
+        gaps.extend(completion_notices)
+        selected["_date"] = pd.to_datetime(selected["date"], errors="coerce", utc=True)
+        selected = selected.sort_values("_date")
+        if not selected.empty:
             row = selected.iloc[-1]
             latest = selected.loc[selected["_date"] == row["_date"]]
             if latest["close"].nunique(dropna=False) > 1:
@@ -264,8 +286,8 @@ def build_holding_analysis(
         gaps.append("尚無這筆持股的有效日期價格；市值暫時無法計算。")
     else:
         price = _number(row.get("close"))
-        date = _text(row.get("date"))
-        fetched = _text(row.get("fetched_at")) or _text(row.get("checked_at"))
+        date = pd.Timestamp(row["date"]).date().isoformat()
+        fetched = _text(row.get("fetched_at"))
         source = _text(row.get("provider")) or "來源未確認"
         status = _price_reference_status(date, fetched, market, now)
         if source == "來源未確認" and status in {"可用", _CACHED_CLOSE_REFERENCE}:

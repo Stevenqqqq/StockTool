@@ -100,7 +100,8 @@ def observation_summary(snapshot: ResearchSnapshot) -> tuple[str, str, str]:
 def render_price_volume_observation(st: Any, snapshot: ResearchSnapshot) -> None:
     from stock_tool.dashboard.components.breakout_observation import render_breakout_observation
 
-    render_breakout_observation(st, snapshot)
+    with st.expander("突破條件與歷史（研究重點已摘要）", expanded=False):
+        render_breakout_observation(st, snapshot)
     st.subheader("價量觀察")
     date = snapshot.price.last_data_date if snapshot.price else None
     st.caption(
