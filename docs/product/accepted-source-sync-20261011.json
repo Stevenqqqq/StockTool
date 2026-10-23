@@ -1,0 +1,237 @@
+{
+  "remote_main": "11ee8d7438e9a06115d3ab75a99d088d4ef55d13",
+  "original_local_head": "f683f32d585b06d4d592f1152869a24f7fad5a59",
+  "commits": [
+    {
+      "commit": "8d18c2859635bdcc9f0c21ee94b4aa70c0b9d653",
+      "title": "Add accepted corporate-action and point-in-time research gates",
+      "origin": {
+        "original_local_commit": "3890f1a",
+        "acceptance": "Product Owner relayed independent Sol acceptance; boundaries in sync report"
+      },
+      "files": [
+        "src/stock_tool/application/strategy_workspace.py",
+        "src/stock_tool/dashboard/pages/strategy_workspace.py",
+        "src/stock_tool/data/corporate_actions.py",
+        "src/stock_tool/fundamentals/models.py",
+        "src/stock_tool/strategies/fundamental_growth.py",
+        "tests/fixtures/integrity_6669_stock_distribution.csv",
+        "tests/test_fundamental_available_date.py",
+        "tests/test_research_integrity_gate.py",
+        "tests/test_strategies.py",
+        "tests/test_strategy_workspace.py"
+      ]
+    },
+    {
+      "commit": "1bc123326af5070a913b5f133717d1390b0f0882",
+      "title": "Hide stale strategy results when PIT evidence becomes unavailable",
+      "origin": {
+        "original_local_commit": "d0129f0",
+        "acceptance": "Product Owner relayed independent Sol acceptance; boundaries in sync report"
+      },
+      "files": [
+        "src/stock_tool/application/strategy_workspace.py",
+        "src/stock_tool/dashboard/pages/strategy_workspace.py",
+        "tests/test_research_integrity_gate.py"
+      ]
+    },
+    {
+      "commit": "10f5e0ab1d0bd085c878353f5351403718daa626",
+      "title": "Add accepted round-trip evidence and excursion metrics",
+      "origin": {
+        "original_local_commit": "19422a9",
+        "acceptance": "Product Owner relayed independent Sol acceptance; boundaries in sync report"
+      },
+      "files": [
+        "src/stock_tool/backtest/engine.py",
+        "src/stock_tool/backtest/metrics.py",
+        "src/stock_tool/backtest/trade_evidence.py",
+        "src/stock_tool/dashboard/app.py",
+        "src/stock_tool/dashboard/components/backtest_evidence.py",
+        "src/stock_tool/dashboard/pages/strategy.py",
+        "src/stock_tool/dashboard/pages/strategy_workspace.py",
+        "src/stock_tool/reports/models.py",
+        "tests/test_backtest_evidence.py"
+      ]
+    },
+    {
+      "commit": "62568bf75d348ee87e91b6f7f3ddf24a20a97c6f",
+      "title": "Distinguish unavailable trade statistics from genuine zero win rate",
+      "origin": {
+        "original_local_commit": "2af2348",
+        "acceptance": "Product Owner relayed independent Sol acceptance; boundaries in sync report"
+      },
+      "files": [
+        "src/stock_tool/dashboard/app.py",
+        "src/stock_tool/reports/models.py",
+        "tests/test_backtest_evidence_r2.py"
+      ]
+    },
+    {
+      "commit": "8778b7008e7cf74c7168cd26ed91b336502417e9",
+      "title": "Add accepted synthetic-only scenario lifecycle and replay",
+      "origin": {
+        "original_local_commit": "f683f32",
+        "acceptance": "Product Owner relayed independent Sol acceptance; boundaries in sync report"
+      },
+      "files": [
+        "scripts/scenario_synthetic_smoke.py",
+        "src/stock_tool/application/scenario_research.py",
+        "src/stock_tool/application/scenario_store.py",
+        "tests/test_scenario_research.py"
+      ]
+    },
+    {
+      "commit": "6645790f2c0be5d900827011966f67948d0bfdc8",
+      "title": "Sync accepted daily holdings refresh, persistence and deduplication",
+      "origin": "daily holdings r3 and format-only closeout",
+      "files": [
+        "src/stock_tool/application/daily_holdings.py",
+        "src/stock_tool/application/daily_holdings_job.py",
+        "src/stock_tool/application/daily_research_scheduler.py",
+        "tests/test_daily_holdings.py",
+        "tests/test_daily_research_scheduler.py",
+        "tests/test_daily_research_runner.py"
+      ]
+    },
+    {
+      "commit": "b90922e1cf941b9546534f92060d223d8aa0ad7f",
+      "title": "Integrate accepted daily holdings UI and official instrument names",
+      "origin": "daily holdings r3; official names r2 passed sub-scope",
+      "files": [
+        "src/stock_tool/application/instrument_names.py",
+        "src/stock_tool/dashboard/instrument_names.py",
+        "src/stock_tool/dashboard/components/daily_holdings.py",
+        "src/stock_tool/dashboard/components/holding_analysis.py",
+        "src/stock_tool/dashboard/pages/home.py",
+        "src/stock_tool/dashboard/pages/portfolio_workspace.py",
+        "src/stock_tool/dashboard/pages/research.py",
+        "src/stock_tool/dashboard/presentation_mapper.py",
+        "src/stock_tool/dashboard/shell.py",
+        "tests/test_instrument_names.py",
+        "tests/test_instrument_names_ui.py",
+        "tests/test_daily_home.py",
+        "tests/test_daily_research_loop.py",
+        "tests/test_dashboard_navigation.py",
+        "tests/test_presentation_mapper.py",
+        "tests/test_price_identity_persistence.py",
+        "src/stock_tool/dashboard/app.py"
+      ]
+    },
+    {
+      "commit": "a021d6bc1531808beeebec1e789a77b39b9c524c",
+      "title": "Sync accepted readable research header and visible data gaps",
+      "origin": "research-header compact independent acceptance 2026-10-05",
+      "files": [
+        "src/stock_tool/dashboard/components/research_header.py",
+        "src/stock_tool/dashboard/components/company_dossier.py",
+        "tests/test_research_header_completeness.py",
+        "tests/test_sprint51_research_integrity.py"
+      ]
+    },
+    {
+      "commit": "e0b288f5bdce92d8a0aa9f1fb4b87199faf8f6a0",
+      "title": "Correct accepted fixed-period TWSE trading calendar evidence",
+      "origin": "calendar-only PASS; security qualification remains incomplete",
+      "files": [
+        "src/stock_tool/application/official_trading_calendars.json",
+        "src/stock_tool/application/prediction_lab.py",
+        "tests/fixtures/qualification/twse-calendar-2025.json",
+        "tests/test_real_data_qualification_calendar.py",
+        "scripts/smoke_qualification_calendar.py"
+      ]
+    },
+    {
+      "commit": "8f56299f3bf59b5d2085a3a6a22e57af6a4f0485",
+      "title": "Restore accepted research candles, moving averages and volume charts",
+      "origin": "research chart r3 independent functional acceptance",
+      "files": [
+        "src/stock_tool/dashboard/components/research_chart.py",
+        "tests/test_research_chart_rendering.py",
+        "tests/test_research_workspace.py",
+        "scripts/research_chart_review_app.py"
+      ]
+    },
+    {
+      "commit": "bc542a30c341c7a0dadfd065fcab9afdc4f8e503",
+      "title": "Pin source imports and reject already loaded stale StockTool modules",
+      "origin": "source import fix independent acceptance; 1931 passed exit 0",
+      "files": [
+        "src/stock_tool/dashboard/app.py",
+        "tests/test_browser_e2e_cdp.py",
+        "tests/test_source_import_priority.py"
+      ]
+    }
+  ],
+  "files_sha256": {
+    "scripts/research_chart_review_app.py": "1abdb2274e40407c4d4a93d6e857829a6e654e7dbb2ac61e1c324a4d7b7cc6b4",
+    "scripts/scenario_synthetic_smoke.py": "129122b39e052cb4a362d87ec9ef26418754f344d3d228f6aeedc4a5123bdd5b",
+    "scripts/smoke_qualification_calendar.py": "b09c360e8cdb92a2d69c762c4c5ef78c0537ceecb035320be6e2d71e83ad38c0",
+    "src/stock_tool/application/daily_holdings.py": "9e4aa23dd1219321f56fc966aa6ab338fc131719274eacdccb8996ae61100b05",
+    "src/stock_tool/application/daily_holdings_job.py": "62d1a61801c5b104a50a92f5de127429cd1a14bebdf64716de18b3ae7eb50dc2",
+    "src/stock_tool/application/daily_research_scheduler.py": "fdf64e4ddcaaceb99f3418486ce7dc9a5f65c9a05e3bac289f314f29c9a0d67f",
+    "src/stock_tool/application/instrument_names.py": "33ec2c0732102995de9b7032dc95b9c55138daa00ed95aa196198866cd819b79",
+    "src/stock_tool/application/official_trading_calendars.json": "a651a7b3f47889ad6ac7303d770a1f4ead68e6fde45fc8292b67ba412d17a02b",
+    "src/stock_tool/application/prediction_lab.py": "65c959ba79273bd264790cf1281cec2e5cf8d931b67361ed8def522e3f1e0406",
+    "src/stock_tool/application/scenario_research.py": "ebcbb0020656f58bf01b9d090fc15209814b6dce2f88c0583b6ed44782f23a75",
+    "src/stock_tool/application/scenario_store.py": "b313c812d5f650cfe420107104da0ea216ac9f5fe0dfb51d6dd1e8b192f00f7a",
+    "src/stock_tool/application/strategy_workspace.py": "a3bbd8499606bceb60e46ccc0afde797e22e846a7d46cdc00d292fd58855e938",
+    "src/stock_tool/backtest/engine.py": "82e3c3c6aedd07d33ae1fb5ee4825ed3482bd6887bceb3c001a87cb3dd8cfc3b",
+    "src/stock_tool/backtest/metrics.py": "59952278f589360ba3faa08b11f40821adce37a7bbb2aca2683764d755a8d8ea",
+    "src/stock_tool/backtest/trade_evidence.py": "fb51bf3d8c6b601b22165d7e2039eadad16d3967ddfc4d34c7226ddbbc03dcf6",
+    "src/stock_tool/dashboard/app.py": "0db72d6cf9bc282b0be7b7db2dd1d7255cf2d792a61c6c96377dcb10504f299b",
+    "src/stock_tool/dashboard/components/backtest_evidence.py": "c7f425110913013149dfde72ba6027e4a374f3a13e4900caab8994a8fcd95604",
+    "src/stock_tool/dashboard/components/company_dossier.py": "99eefbff8771411f35f64acb101b706ff8f5903a3600c67f2749b507fb8b83fa",
+    "src/stock_tool/dashboard/components/daily_holdings.py": "341eccd6ae9d6ffb1545eb25a938c130ff143cd5014f51b9cbd499b3d35d7073",
+    "src/stock_tool/dashboard/components/holding_analysis.py": "bd450ba5e96f3c04958b951d4fd9c0abff0049561f1d03615be97b969d65c532",
+    "src/stock_tool/dashboard/components/research_chart.py": "48638c96a5e174a46e899dfd662b8521f887a0cb4a701e66e8a03b795803757d",
+    "src/stock_tool/dashboard/components/research_header.py": "a3d59671ea5f301366766591a4352aa7255a0c9318d3db8f88188f3aaf22f452",
+    "src/stock_tool/dashboard/instrument_names.py": "72a6c688a0ac9f30f048b820d3b444b2de808aed88f164815a400a6462bae990",
+    "src/stock_tool/dashboard/pages/home.py": "2c43824b6ee1482e8de41de546d808d56b79f49f761be5b4f47cb06ef8d9dc6c",
+    "src/stock_tool/dashboard/pages/portfolio_workspace.py": "665ff74bd1915648739c07525338aa9b8527a3a6d23d3cb3039002fea6867c04",
+    "src/stock_tool/dashboard/pages/research.py": "81f839e6fe12c6b0379ed34f02a4b264e262b8923c2915fc321819ee3b852d05",
+    "src/stock_tool/dashboard/pages/strategy.py": "099729e2959b7b40b9253c96c058e161af3d3a4229a60c696237ebad1da01075",
+    "src/stock_tool/dashboard/pages/strategy_workspace.py": "0868e184b6ea19ce6b30e7164a36f53d365cc35855195b207248eb6e5eadf82b",
+    "src/stock_tool/dashboard/presentation_mapper.py": "3429a3dd9d57120db03f7f960e86036a6b1119ca07ef2d968af91b2252decd68",
+    "src/stock_tool/dashboard/shell.py": "c36066271953fcbd6c8ac82a776f1659f1d847f83a347ca84112c94da92c59a3",
+    "src/stock_tool/data/corporate_actions.py": "02c69af10178a57f507a16c5eb976bf4df28bfa9f79fbd459699fec92034f64b",
+    "src/stock_tool/fundamentals/models.py": "1ff45f164769f4568cbd84c91a98a8aa187d5e033f21881d67be8ffe77cef91d",
+    "src/stock_tool/reports/models.py": "269dfa6be90a3c5f018c53b84594862b405f278f95a92013a6fe9284e674b74a",
+    "src/stock_tool/strategies/fundamental_growth.py": "b5f6996e9779808eabfa58805f6c20fcf093c4488164815b90c52a32ba751f15",
+    "tests/fixtures/integrity_6669_stock_distribution.csv": "c4cba371fafae1b33f27aa59ba37980bfdadf9f6c9f51ec90f4df8baf665ecb9",
+    "tests/fixtures/qualification/twse-calendar-2025.json": "5c85396aa2c0bf45add08a257aa6343aac2d48f9d6bb54da17c7f88fefcb71f8",
+    "tests/test_backtest_evidence.py": "703c3d05b6b78411b2441dc5c78a5af0200d087e5ba71bdcbc6df211fad9bf38",
+    "tests/test_backtest_evidence_r2.py": "c014aee1a52fb928675449e0a7d6a6e2a21e348fee19adc8c11a3aa5ba52ce58",
+    "tests/test_browser_e2e_cdp.py": "78eb7baa927ea9ee10579e88e2b376518f275c7c51377d068ab3667674844056",
+    "tests/test_daily_holdings.py": "4a09cdbb8641b653c655f6615e555eb5516b33348f003cada1052ade104f2024",
+    "tests/test_daily_home.py": "93aafdb251798753823b0c730ffb585f942659700150651d6fd1f0f15275c767",
+    "tests/test_daily_research_loop.py": "9613eb9a909e8c4ba09cb89eaefac6a51912df64dafe0f9f41087f07b531371f",
+    "tests/test_daily_research_runner.py": "19bc1458fede494e32ffdbce886d2f9235bebb4db6b2d67bb441b832538f09a3",
+    "tests/test_daily_research_scheduler.py": "f52282f7775196e703131fe0351fdc1a1d1f787d9aff52678fa82ef0867f284f",
+    "tests/test_dashboard_navigation.py": "4c4147d48f397d560e3b4a198ed7f704bffc30808cc0bf0ed3cfb91e43dda040",
+    "tests/test_fundamental_available_date.py": "260469cad9911deb1f6ebeb4787523aca2e21bbb28693f5641f3d3bf4f4692e0",
+    "tests/test_instrument_names.py": "e8f6c3d1967192059b7248597bb4b1882281c3982b1630c78fc5955e9182d213",
+    "tests/test_instrument_names_ui.py": "c8fdc543b80a18fc1356ce70531d1374feb4c5dcc158b8b8844b0c7b4121e758",
+    "tests/test_presentation_mapper.py": "c2816778c5db7ad89f99b921a99b502d93827f46f9d61c2957af5135f1021d31",
+    "tests/test_price_identity_persistence.py": "65d26df8ad3eeaedc35938760aa65a1ec4d2384a4f215908b29402c5f8cad689",
+    "tests/test_real_data_qualification_calendar.py": "5a4d9bbda4cee9630ebad20137810a11b7a4773faa389fed787fe5e3fe1ee1ea",
+    "tests/test_research_chart_rendering.py": "fd2e3637aa28bafa33f891ad4e686a4ed52c6fc96b7c0f76a93f532e34261d26",
+    "tests/test_research_header_completeness.py": "51c74c5902d68b18677b12cc60c265482dc04e003c81077496118e355a8a4407",
+    "tests/test_research_integrity_gate.py": "fae0a94a1c21b9e93f2319eab4f5288545c8ba1390966704e1e53d73aa412e6a",
+    "tests/test_research_workspace.py": "cdcebffb87b6747388ccc06d582fc85a76dd0d955e25ed2ee98861b11f2c73b6",
+    "tests/test_scenario_research.py": "1702df64eb7c8988a654301a3142705619a6ca7af62a04f88d03153fa4a58ba8",
+    "tests/test_source_import_priority.py": "7f52c5d01202d8f8a3b7f56218fe45cd54c3b7b92466e433ec74693b7c91ed76",
+    "tests/test_sprint51_research_integrity.py": "476ec9eac25b86ed3b2eb4cf578d9393e45cdfb97cea974721f90ee8efc9fea2",
+    "tests/test_strategies.py": "f5b25c07dd6c2ac84f03bc728b9e0c37a8dc96e7da4c76c26443d4df5bfc6c30",
+    "tests/test_strategy_workspace.py": "e72264c4e18fe289833e26a570884ffc0918721f5d3eb1f5c7f51fe791a3275b"
+  },
+  "acceptance_basis": "Independent Sol reviews and Product Owner relayed acceptance; scope and limitations in companion Markdown",
+  "tests_rerun_during_sync": false,
+  "local_evidence_document_sha256": {
+    "docs/product/research-chart-fix-r3-independent-review-20261011.md": "9906a24603a56f6c0eab1c07f3aced85774f4d2a79b5e463b45d5ba6ad41f985",
+    "docs/product/source-import-fix-20261011/source-index.json": "5c755ea609e393d1a932bfad374c41f0c8e7e5491be4b9f11037cccba49052af",
+    "docs/product/source-import-fix-20261011/verification.json": "c4db532ff063fdbd5ce026f578633e2d1597687f3d929ab1a4625f4dc92ff050",
+    "docs/product/real-data-qualification-v1-20261008/source-index.json": "1c3562339a418581e185f7b582c66d7f5a6223de944c31a25557063e00c08cdc",
+    "docs/product/daily-holdings-format-closeout-20261002/format-proof.json": "823527986e98e38e22168bcbe97b0e84b84ced709a82b71699b3c51b504d2519"
+  }
+}

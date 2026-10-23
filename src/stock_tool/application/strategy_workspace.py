@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Mapping
+from pathlib import Path
 
 import pandas as pd
 
@@ -37,6 +38,8 @@ from stock_tool.dashboard.backtest_ui import (
 )
 from stock_tool.dashboard.pages.strategy import build_strategy_health_preflight
 from stock_tool.domain.models import Market
+from stock_tool.data.corporate_actions import load_corporate_actions_csv, raw_research_safety_errors
+from stock_tool.fundamentals.models import visible_fundamentals_as_of
 from stock_tool.strategies.base import StrategyBase
 from stock_tool.strategies.registry import StrategyDefinition, get_strategy_definition
 
@@ -93,11 +96,56 @@ class StrategyHealthRun:
     message: str | None = None
 
 
+def _fundamental_availability_check(
+    *,
+    strategy_key: str,
+    parameters: Mapping[str, Any],
+    symbol: str,
+    price_data: pd.DataFrame,
+    fundamentals: pd.DataFrame | None,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Shared current-input check for UI preflight and actual execution."""
+    errors: list[str] = []
+    pit_warnings: tuple[str, ...] = ()
+    if strategy_key == "fundamental_growth":
+        mode = str(parameters.get("point_in_time_mode", "strict"))
+        if mode == "legacy":
+            pit_warnings = (
+                "Legacy 已明確選用：未驗證可得日期，可能有前視偏誤；結果不是嚴格歷史研究。",
+            )
+        elif fundamentals is None or fundamentals.empty:
+            errors.append("資料不足：strict 歷史研究需要具 available_date 的基本面。")
+        else:
+            selected = (
+                fundamentals.loc[fundamentals["symbol"].astype(str).eq(symbol)]
+                if "symbol" in fundamentals
+                else fundamentals.iloc[:0]
+            )
+            available = visible_fundamentals_as_of(selected, str(price_data["date"].max()))
+            pit_warnings = available.warnings
+            if available.data.empty:
+                errors.append(
+                    "資料不足：研究期間沒有具 available_date 的可用基本面；不以財報期間代替。"
+                )
+    return tuple(errors), pit_warnings
+
+
 class StrategyWorkspaceApplicationService:
     """Coordinate one isolated, deterministic strategy research workflow."""
 
-    def __init__(self, *, engine_factory: Any = BacktestEngine) -> None:
+    def __init__(
+        self, *, engine_factory: Any = BacktestEngine, corporate_actions_path: Path | None = None
+    ) -> None:
         self._engine_factory = engine_factory
+        self.corporate_actions_path = corporate_actions_path
+
+    def integrity_errors(self, prices: pd.DataFrame) -> tuple[str, ...]:
+        try:
+            path = self.corporate_actions_path
+            actions = load_corporate_actions_csv(path) if path is not None and path.exists() else ()
+            return raw_research_safety_errors(prices, actions)
+        except (ValueError, OSError):
+            return ("資料不足：公司行動資料無法讀取或契約無效，已停止回測。",)
 
     def definition(self, strategy_key: str) -> StrategyDefinition:
         return get_strategy_definition(strategy_key)
@@ -165,10 +213,24 @@ class StrategyWorkspaceApplicationService:
         values: BacktestFormValues,
         price_data: pd.DataFrame | None,
         definition: StrategyDefinition,
+        fundamentals: pd.DataFrame | None = None,
     ) -> tuple[BacktestValidationResult, object]:
         """Return existing form validation plus the bounded health plan."""
 
         validation = validate_backtest_form(values)
+        if price_data is not None and not price_data.empty:
+            pit_errors, pit_warnings = _fundamental_availability_check(
+                strategy_key=definition.key,
+                parameters=values.strategy_parameters,
+                symbol=values.symbol,
+                price_data=price_data,
+                fundamentals=fundamentals,
+            )
+            validation = BacktestValidationResult(
+                errors=(*validation.errors, *self.integrity_errors(price_data), *pit_errors),
+                warnings=(*validation.warnings, *pit_warnings),
+                next_steps=validation.next_steps,
+            )
         if price_data is None or price_data.empty:
             return validation, build_strategy_health_preflight(
                 price_data=pd.DataFrame(), definition=definition
@@ -217,7 +279,7 @@ class StrategyWorkspaceApplicationService:
             "execution": {
                 "model": "T+1",
                 "price_column": "open",
-                "corporate_action_policy": "existing_engine_policy",
+                "corporate_action_policy": "research-integrity-gate-v1/raw-fail-closed",
                 "version": "backtest-contract-v1",
             },
             "application_version": __version__,
@@ -241,6 +303,20 @@ class StrategyWorkspaceApplicationService:
         """Execute only after the shared validation has passed."""
 
         validation = validate_backtest_form(values)
+        errors = list(self.integrity_errors(price_data))
+        pit_errors, pit_warnings = _fundamental_availability_check(
+            strategy_key=strategy.name,
+            parameters=strategy.parameters,
+            symbol=values.symbol,
+            price_data=price_data,
+            fundamentals=fundamentals,
+        )
+        errors.extend(pit_errors)
+        validation = BacktestValidationResult(
+            errors=(*validation.errors, *errors),
+            warnings=(*validation.warnings, *pit_warnings),
+            next_steps=validation.next_steps,
+        )
         # The workspace has one allocation control.  Refuse a caller that
         # constructed a strategy with a different target percentage rather
         # than silently allowing UI, engine, and manifest to diverge.
@@ -293,7 +369,11 @@ class StrategyWorkspaceApplicationService:
                 "not_run",
                 "策略執行失敗，請檢查資料與參數後重試。",
             )
-        warnings = tuple(str(item) for item in result.warnings)
+        warnings = (
+            *validation.warnings,
+            *tuple(str(item) for item in result.warnings),
+            *signals.attrs.get("fundamental_warnings", ()),
+        )
         manifest = self.build_manifest(
             values=values,
             data=data,
@@ -314,6 +394,10 @@ class StrategyWorkspaceApplicationService:
         values: BacktestFormValues,
     ) -> StrategyHealthRun:
         """Run bounded OOS, walk-forward, and sensitivity without optimization."""
+
+        integrity_errors = self.integrity_errors(price_data)
+        if integrity_errors:
+            return StrategyHealthRun("blocked", None, None, None, "；".join(integrity_errors))
 
         if not getattr(health_plan, "can_run", False):
             return StrategyHealthRun(

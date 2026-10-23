@@ -175,13 +175,13 @@ def _render_oos(st: Any, result: Any) -> None:
                 "期間": "樣本內",
                 "總報酬": result.in_sample.metrics.total_return,
                 "最大回撤": result.in_sample.metrics.max_drawdown,
-                "交易次數": result.in_sample.metrics.number_of_trades,
+                "成交筆數（fills）": result.in_sample.metrics.number_of_trades,
             },
             {
                 "期間": "樣本外",
                 "總報酬": result.out_of_sample.metrics.total_return,
                 "最大回撤": result.out_of_sample.metrics.max_drawdown,
-                "交易次數": result.out_of_sample.metrics.number_of_trades,
+                "成交筆數（fills）": result.out_of_sample.metrics.number_of_trades,
             },
         ]
     )
@@ -201,7 +201,7 @@ def _render_walk_forward(st: Any, result: Any) -> None:
             "樣本內": f"{fold.train_period.start} 至 {fold.train_period.end}",
             "樣本外": f"{fold.test_period.start} 至 {fold.test_period.end}",
             "樣本外總報酬": fold.test_run.metrics.total_return,
-            "交易次數": fold.test_run.metrics.number_of_trades,
+            "成交筆數（fills）": fold.test_run.metrics.number_of_trades,
         }
         for fold in result.folds
     ]
@@ -219,7 +219,7 @@ def _render_sensitivity(st: Any, result: Any) -> None:
         {
             "參數": ", ".join(f"{key}={value}" for key, value in run.parameters),
             "總報酬": run.total_return,
-            "交易次數": run.run.metrics.number_of_trades,
+            "成交筆數（fills）": run.run.metrics.number_of_trades,
         }
         for run in result.runs
     ]

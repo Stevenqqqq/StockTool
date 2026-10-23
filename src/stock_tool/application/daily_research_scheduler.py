@@ -27,6 +27,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 
+from stock_tool.application.completed_daily_prices import completed_market_prices
 from stock_tool.application.daily_brief import DailyBriefService, ResearchContinuation
 from stock_tool.application.daily_research_brief import (
     DailyResearchBrief,
@@ -1275,7 +1276,10 @@ class HeadlessDailyResearchRunner:
         portfolio = load_portfolio(self.paths.portfolio_file)
         watchlist = load_watchlist(self.paths.watchlist_file)
         effective = build_effective_watchlist(watchlist, portfolio)
-        identities = _identities(effective)[: self.max_symbols]
+        # Holdings must not disappear behind a longer watchlist. Refresh all
+        # held identities; the existing bound applies to optional watch targets.
+        held = _identities(portfolio)
+        identities = tuple(dict.fromkeys((*held, *_identities(effective)[: self.max_symbols])))
         if not identities:
             # No new targets does not imply no due samples.  Keep the first
             # five stages explicitly skipped, then let the shared evaluator
@@ -1381,6 +1385,18 @@ class HeadlessDailyResearchRunner:
                 stages=stage_trace.as_tuple(),
             )
 
+        # Keep per-holding results independent from market-wide coverage.
+        if not portfolio.empty:
+            _publish_daily_holdings(
+                self.paths,
+                portfolio,
+                identities,
+                refresh_reasons,
+                started,
+                self.now_fn,
+                fetch_fx=self.refresh_callback is None,
+            )
+
         stage_trace.enter("market_refresh")
         try:
             market_result = self._refresh_market_snapshot()
@@ -1443,7 +1459,7 @@ class HeadlessDailyResearchRunner:
             )
 
         stage_trace.enter("brief")
-        prices, source_map = _load_price_context(self.paths)
+        prices, source_map = _load_price_context(self.paths, now=self.now_fn())
         input_hash = _input_snapshot_hash(
             identities, self.paths, prices=prices, market_result=market_result
         )
@@ -1516,7 +1532,13 @@ class HeadlessDailyResearchRunner:
                         provider="local",
                         source_type="cache",
                         provider_symbol=None,
-                        last_data_date=str(value)[:10] if value else None,
+                        last_data_date=pd.Timestamp(
+                            prices.loc[
+                                prices["market"] + ":" + prices["symbol"] == key, "date"
+                            ].max()
+                        )
+                        .date()
+                        .isoformat(),
                         checked_at=value,
                     )
                     for key, value in source_map.items()
@@ -2019,16 +2041,66 @@ def _identities(frame: pd.DataFrame) -> tuple[Symbol, ...]:
     return tuple(found[key] for key in sorted(found))
 
 
-def _load_price_context(paths: RuntimePaths) -> tuple[pd.DataFrame, dict[str, str]]:
+def _publish_daily_holdings(
+    paths: RuntimePaths,
+    portfolio: pd.DataFrame,
+    identities: tuple[Symbol, ...],
+    refresh_reasons: tuple[str, ...],
+    started: datetime,
+    now_fn: Callable[[], datetime],
+    *,
+    fetch_fx: bool,
+) -> None:
+    from stock_tool.application.daily_holdings import publish_holdings, positions_fingerprint
+    from stock_tool.portfolio_fx import (
+        JsonFxQuoteCache,
+        UsdTwdFxResolutionService,
+        YFinanceUsdTwdProvider,
+    )
+    from stock_tool.portfolio_valuation import Currency
+
+    prices_for_holdings, _ = _load_price_context(paths, now=now_fn())
+    fx_cache = JsonFxQuoteCache(paths.cache_dir / "usd_twd_fx.json", now=now_fn)
+    fx_quote = fx_cache.get_quote(Currency.USD, Currency.TWD)
+    if "USD" in portfolio.get("currency", pd.Series(dtype=str)).values and fetch_fx:
+        fx_quote = (
+            UsdTwdFxResolutionService(
+                online=YFinanceUsdTwdProvider(now=now_fn),
+                cache=fx_cache,
+                now=now_fn,
+            )
+            .resolve()
+            .quote
+        )
+    failed = {
+        symbol.canonical
+        for symbol in identities
+        if any(reason.startswith(symbol.canonical + ":") for reason in refresh_reasons)
+    }
+    if positions_fingerprint(load_portfolio(paths.portfolio_file)) != positions_fingerprint(
+        portfolio
+    ):
+        raise ValueError("持股已變更，未套用舊部位的每日結果")
+    publish_holdings(
+        paths, portfolio, prices_for_holdings, now=now_fn(), fx_quote=fx_quote, failed=failed
+    )
+
+
+def _load_price_context(
+    paths: RuntimePaths, *, now: datetime | None = None
+) -> tuple[pd.DataFrame, dict[str, str]]:
     storage = SQLitePriceStorage(paths.processed_dir / "stock_data.sqlite")
     if not storage.price_identity_sidecar_path.is_file():
         return pd.DataFrame(columns=["symbol", "market", "date", "close", "volume"]), {}
     context = storage.load_market_qualified_price_context()
     if context.warnings or not context.records:
         return pd.DataFrame(columns=["symbol", "market", "date", "close", "volume"]), {}
-    frame = pd.DataFrame(list(context.records))
+    frame = completed_market_prices(pd.DataFrame(list(context.records)), now=now)
+    available = set(frame["market"] + ":" + frame["symbol"])
     checked = {
-        item.symbol.canonical: item.checked_at for item in context.provenance if item.checked_at
+        item.symbol.canonical: item.checked_at
+        for item in context.provenance
+        if item.checked_at and item.symbol.canonical in available
     }
     return frame, checked
 

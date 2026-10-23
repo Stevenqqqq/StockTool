@@ -117,6 +117,9 @@ def _stage_fault_market_result() -> Any:
 def _prepare_stage_fault_runner(monkeypatch, tmp_path: Path):
     """Configure a real HeadlessDailyResearchRunner with deterministic local inputs."""
 
+    # These tests replace valuation/briefs with non-domain objects. The private
+    # holdings projection has its own real-boundary tests in test_daily_holdings.
+    monkeypatch.setattr(scheduler_module, "_publish_daily_holdings", lambda *_a, **_k: None)
     paths = RuntimePaths(tmp_path / "runtime").ensure_directories()
     paths.portfolio_file.write_text(
         "symbol,market,quantity,average_cost\n2330,TWSE,1,600\n", encoding="utf-8"
@@ -130,7 +133,7 @@ def _prepare_stage_fault_runner(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(
         scheduler_module,
         "_load_price_context",
-        lambda _paths: (
+        lambda _paths, **_kwargs: (
             pd.DataFrame(
                 [{"symbol": "2330", "market": "TWSE", "date": "2026-08-23", "close": 600.0}]
             ),
@@ -215,7 +218,7 @@ def test_headless_stage_exception_preserves_completed_trace(
         monkeypatch.setattr(
             scheduler_module,
             "_load_price_context",
-            lambda *_a: (_ for _ in ()).throw(RuntimeError("price")),
+            lambda *_a, **_kw: (_ for _ in ()).throw(RuntimeError("price")),
         )
     elif fault_stage == "daily_brief_build":
         monkeypatch.setattr(
@@ -319,6 +322,7 @@ def test_evidence_target_refresh_replays_preloaded_rows_without_provider(
             source_type="evidence_fixture",
             last_data_date="2026-08-23",
             checked_at="2026-08-24T10:00:00+00:00",
+            fetched_at="2026-08-24T10:00:00+00:00",
         ),
     )
     monkeypatch.setenv("STOCK_TOOL_EVIDENCE_MODE", "sprint32.1.1")
@@ -943,6 +947,7 @@ def test_adapter_run_now_does_not_send_run_for_missing_task() -> None:
 
 
 def test_new_manual_date_with_same_hash_still_refreshes(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(scheduler_module, "_publish_daily_holdings", lambda *_a, **_k: None)
     paths = RuntimePaths(tmp_path / "runtime").ensure_directories()
     paths.portfolio_file.write_text(
         "symbol,market,quantity,average_cost\n2330,TWSE,1,600\n", encoding="utf-8"
@@ -984,13 +989,15 @@ def test_corrupt_immutable_brief_history_never_mints_a_new_baseline(
 ) -> None:
     """A bad history is a security event, not equivalent to no history."""
 
+    monkeypatch.setattr(scheduler_module, "_publish_daily_holdings", lambda *_a, **_k: None)
+
     paths = RuntimePaths(tmp_path / "runtime").ensure_directories()
     frame = pd.DataFrame([{"symbol": "2330", "market": "TWSE", "quantity": 1.0}])
     monkeypatch.setattr(scheduler_module, "load_portfolio", lambda _path: frame)
     monkeypatch.setattr(scheduler_module, "load_watchlist", lambda _path: frame.iloc[0:0])
     monkeypatch.setattr(scheduler_module, "build_effective_watchlist", lambda _w, _p: frame)
     monkeypatch.setattr(
-        scheduler_module, "_load_price_context", lambda _paths: (pd.DataFrame(), {})
+        scheduler_module, "_load_price_context", lambda _paths, **_kw: (pd.DataFrame(), {})
     )
     monkeypatch.setattr(scheduler_module.DailyBriefService, "build", lambda *_a, **_k: object())
     monkeypatch.setattr(

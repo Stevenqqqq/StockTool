@@ -41,7 +41,7 @@ _OFFICIAL_CALENDAR_SOURCES: dict[tuple[str, int], dict[str, Any]] = {
         "endpoint": "https://www.twse.com.tw/holidaySchedule/holidaySchedule?response=json&date=2025",
         "raw_payload_sha256": "5c85396aa2c0bf45add08a257aa6343aac2d48f9d6bb54da17c7f88fefcb71f8",
         "raw_payload_size_bytes": 2227,
-        "normalized_payload_sha256": "a30e656b3b0e450faa5d8678e6f288396b078c0d8fa73a8b455250fc2c585bc8",
+        "normalized_payload_sha256": "8c38c30b566716e8725153727c85fc070bb95e44a23eee7b6178a122e64c4352",
     },
     ("TWSE", 2026): {
         "source": "TWSE official holiday schedule",

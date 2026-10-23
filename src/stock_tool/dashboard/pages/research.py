@@ -16,7 +16,11 @@ from stock_tool.dashboard.components.research_chart import (
     build_research_chart,
     render_research_chart,
 )
-from stock_tool.dashboard.components.research_header import render_research_header
+from stock_tool.dashboard.components.research_header import (
+    render_research_header,
+    render_research_focus,
+)
+from stock_tool.dashboard.components.price_volume_observation import render_price_volume_observation
 from stock_tool.dashboard.components.risk_summary import render_risk_summary
 from stock_tool.dashboard.components.scorecard import render_scorecard
 from stock_tool.dashboard.components.search import render_global_search
@@ -25,6 +29,7 @@ from stock_tool.research.assistant import AIResearchAssistant, ResearchAssistant
 from stock_tool.research.evidence import build_evidence_bundle
 from stock_tool.research.library import ResearchLibrary, ResearchLibraryError
 from stock_tool.runtime_paths import default_runtime_paths
+from stock_tool.dashboard.presentation_mapper import format_taiwan_company_display
 
 SCENARIO_REFERENCE_HEADING = "情境參考區間"
 
@@ -36,14 +41,13 @@ def render_research_workspace(
     library: ResearchLibrary | None = None,
     ai_cache_directory: Path | None = None,
     on_handoff: Callable[[str, ResearchSnapshot], None] | None = None,
+    on_compare: Callable[[], None] | None = None,
 ) -> SearchPreparation | None:
     """Render a focused workspace without recalculating snapshot data in the UI."""
 
-    render_research_header(st, snapshot)
-    paths = default_runtime_paths()
-    library = library or ResearchLibrary(paths.research_library_dir)
-    library_service = ResearchLibraryApplicationService(library)
-    bundle = build_evidence_bundle(snapshot)
+    if on_compare is not None and st.button("自選股比較", key="research_open_comparison"):
+        on_compare()
+        return None
     with st.expander("研究其他股票", expanded=False):
         preparation = render_global_search(
             st,
@@ -52,18 +56,18 @@ def render_research_workspace(
             default_market=snapshot.symbol.market.value,
         )
 
+    render_research_header(st, snapshot, compact=True)
+    paths = default_runtime_paths()
+    library = library or ResearchLibrary(paths.research_library_dir)
+    library_service = ResearchLibraryApplicationService(library)
+    bundle = build_evidence_bundle(snapshot)
     overview, chart_tab, fundamentals, scoring, evidence, risk = st.tabs(
         ("總覽", "圖表", "基本面", "評分解釋", "證據與資料", "風險與情境")
     )
     with overview:
-        if snapshot.company_profile is not None and snapshot.company_profile.dossier is not None:
-            _render_company_overview(st, snapshot, compact=True)
-        else:
-            company, chart = st.columns((1, 1))
-            with company:
-                _render_company_overview(st, snapshot, compact=True)
-            with chart:
-                _render_overview_chart(st, snapshot)
+        render_research_focus(st, snapshot)
+        _render_overview_chart(st, snapshot)
+        _render_company_overview(st, snapshot, compact=True)
         render_risk_summary(st, snapshot)
     with chart_tab:
         _render_chart(st, snapshot)
@@ -239,12 +243,21 @@ def _render_company_overview(st: Any, snapshot: ResearchSnapshot, *, compact: bo
     if profile.dossier is not None:
         from stock_tool.dashboard.components.company_dossier import render_company_dossier
 
-        st.write(f"{profile.company_name}（{profile.symbol}）")
-        render_company_dossier(st, profile.dossier)
+        st.write(
+            format_taiwan_company_display(
+                profile.symbol, profile.company_name, snapshot.symbol.market.value
+            )
+        )
+        render_company_dossier(st, profile.dossier, show_status=False)
         return
     st.caption("公司名稱與產業分類標示為事實資料；業務與產業鏈內容標示為研究推論。")
     st.markdown("**事實資料**")
-    st.write(f"公司名稱：{profile.company_name}")
+    st.write(
+        "公司名稱："
+        + format_taiwan_company_display(
+            profile.symbol, profile.company_name, snapshot.symbol.market.value
+        )
+    )
     industry_str = (
         f"{profile.industry}／{profile.sector}"
         if profile.sector and profile.sector != profile.industry
@@ -284,13 +297,7 @@ def _render_company_inferences(st: Any, profile: Any) -> None:
 
 
 def _render_overview_chart(st: Any, snapshot: ResearchSnapshot) -> None:
-    st.subheader("價格圖")
-    model = build_research_chart(
-        snapshot.price_history,
-        indicators=snapshot.indicators,
-        period="1Y",
-    )
-    render_research_chart(st, model, compact=True)
+    render_price_volume_observation(st, snapshot)
 
 
 def _render_chart(st: Any, snapshot: ResearchSnapshot) -> None:

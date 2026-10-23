@@ -9,6 +9,8 @@ import pandas as pd
 from stock_tool.application.holding_analysis import build_holding_analysis
 from stock_tool.research.assistant import AIResearchAssistant, ResearchAssistantCache
 from stock_tool.runtime_paths import RuntimePaths
+from stock_tool.dashboard.presentation_mapper import format_taiwan_company_display
+from stock_tool.dashboard.instrument_names import name_notice
 
 
 def render_holding_analysis(st: Any, positions: pd.DataFrame, analysis: object) -> None:
@@ -87,7 +89,11 @@ def render_holding_analysis(st: Any, positions: pd.DataFrame, analysis: object) 
         refresh_failed=failed,
     )
     st.session_state.setdefault("holding_analysis_snapshots", {})[identity] = snapshot
-    st.markdown(f"**{profile.get('name', symbol)} · {snapshot.instrument_type}**")
+    display_name = format_taiwan_company_display(symbol, profile.get("name"), market)
+    st.markdown(f"**{display_name} · {snapshot.instrument_type}**")
+    notice = name_notice(market, symbol)
+    if notice:
+        st.info(notice)
     labels = {
         "Technology": "科技",
         "Semiconductors": "半導體",

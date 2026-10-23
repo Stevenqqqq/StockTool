@@ -17,10 +17,33 @@ from typing import Any, BinaryIO, Mapping, Sequence, cast
 import pandas as pd
 
 SRC_ROOT = Path(__file__).resolve().parents[2]
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
+if not getattr(sys, "frozen", False):
+    # Editable installs may append src *after* an older site-packages copy.
+    sys.path[:] = [str(SRC_ROOT), *[p for p in sys.path if Path(p).resolve() != SRC_ROOT]]
+    for _module_name, _module in tuple(sys.modules.items()):
+        if _module_name == "stock_tool" or _module_name.startswith("stock_tool."):
+            _origin = getattr(_module, "__file__", None)
+            if (
+                _origin is None
+                or not Path(_origin).resolve().is_relative_to(SRC_ROOT / "stock_tool")
+                or any(
+                    not Path(p).resolve().is_relative_to(SRC_ROOT / "stock_tool")
+                    for p in getattr(_module, "__path__", ())
+                )
+            ):
+                raise RuntimeError(
+                    "StockTool source import conflict: an already loaded module does not "
+                    "belong to this source tree. Restart with the current src first in "
+                    f"PYTHONPATH. Conflicting module: {_module_name}"
+                )
+
+    import stock_tool as _source_package
+
+    if Path(_source_package.__file__).resolve() != SRC_ROOT / "stock_tool" / "__init__.py":
+        raise RuntimeError("StockTool source import conflict: unexpected package origin.")
 
 from stock_tool.backtest import BacktestEngine, BacktestResult
+from stock_tool.application.completed_daily_prices import completed_market_prices
 from stock_tool.application.daily_brief import (
     DailyBrief,
     DailyBriefService,
@@ -315,6 +338,9 @@ def main() -> None:
     st.set_page_config(page_title=APP_TITLE, layout="wide")
     _init_state(st)
     apply_dashboard_styles(st)
+    from stock_tool.dashboard.instrument_names import bind_names
+
+    poll_names = bind_names(st, RuntimePaths.from_environment())
 
     dependencies = DashboardShellDependencies(
         ensure_symbol_data=_ensure_symbol_data,
@@ -327,6 +353,7 @@ def main() -> None:
         build_research_snapshot=_build_research_snapshot,
         build_daily_brief=_build_daily_brief,
         build_daily_research_loop=_build_daily_research_loop,
+        render_daily_holdings=_render_daily_holdings,
         refresh_daily_data=_refresh_daily_data,
         run_daily_research=lambda: _run_daily_research(st),
         build_daily_research_run=lambda: DailyResearchRunner(
@@ -353,8 +380,10 @@ def main() -> None:
     )
     if st.session_state.legacy_dashboard:
         render_legacy_dashboard(st, dependencies)
+        poll_names()
         return
     render_dashboard_shell(st, dependencies)
+    poll_names()
 
 
 def _streamlit() -> Any:
@@ -842,9 +871,22 @@ def _page_watchlist(st: Any) -> None:
     st.caption("自選股會儲存在 data/watchlist.csv，可搭配自動抓資料逐檔研究。")
     watchlist = _get_watchlist(st)
 
+    from stock_tool.dashboard.components.watchlist_comparison import render_watchlist_comparison
+    from stock_tool.dashboard.shell import _route_explore_research
+
+    render_watchlist_comparison(
+        st,
+        build_effective_watchlist(watchlist, _get_portfolio(st)),
+        load_prices=lambda: _portfolio_price_context(st),
+        refresh=lambda symbol: _hydrate_daily_symbol(st, symbol),
+        on_research=lambda symbol: _route_explore_research(st, symbol),
+    )
+
     col1, col2, col3 = st.columns([1, 1, 2])
     symbol = col1.text_input("新增股票代號", value="2330", key="watchlist_symbol")
-    market = col2.selectbox("市場", ["TW", "US", "AUTO", "CUSTOM"], key="watchlist_market")
+    market = col2.selectbox(
+        "市場", ["TWSE", "TPEX", "US", "TW", "AUTO", "CUSTOM"], key="watchlist_market"
+    )
     note = col3.text_input("備註", value="", key="watchlist_note")
     if st.button("加入 / 更新自選股"):
         watchlist = add_watchlist_symbol(watchlist, symbol=symbol, market=market, note=note)
@@ -2394,6 +2436,12 @@ def _build_daily_research_loop(st: Any) -> DailyResearchLoopResult:
     return DailyResearchLoopService().restore(_daily_research_snapshot_store().load())
 
 
+def _render_daily_holdings(st: Any) -> Any:
+    from stock_tool.dashboard.components.daily_holdings import render_daily_holdings
+
+    return render_daily_holdings(st, _runtime_paths())
+
+
 def _run_daily_research(st: Any) -> Any:
     """Run the shared application flow once, then hydrate the UI from local outputs."""
 
@@ -2756,9 +2804,7 @@ def _daily_research_sources(st: Any) -> dict[str, DailyResearchSource]:
             provider=_single_frame_text(group, "provider"),
             source_type=_single_frame_text(group, "source_type"),
             provider_symbol=_single_frame_text(group, "provider_symbol"),
-            last_data_date=(
-                _single_frame_text(group, "last_data_date") or _latest_frame_date(group)
-            ),
+            last_data_date=_latest_frame_date(group),
             checked_at=max(checked_values) if checked_values else None,
         )
     return sources
@@ -2978,7 +3024,7 @@ def _hydrate_daily_symbol(st: Any, symbol: Symbol) -> DailyRefreshRecord:
 
 
 def _portfolio_price_context(st: Any) -> pd.DataFrame | None:
-    """Return the widest available local price context for portfolio valuation."""
+    """Return completed local daily bars for home, daily research and valuation."""
 
     stored_prices = _load_default_database_prices(_runtime_database_path())
     if (
@@ -2990,7 +3036,15 @@ def _portfolio_price_context(st: Any) -> pd.DataFrame | None:
         # for legacy inspection, but never let valuation infer a market from them.
         stored_prices = stored_prices.copy(deep=True)
         stored_prices["market"] = "UNKNOWN"
-    return _merge_price_frames([stored_prices, _market_qualified_current_prices(st)])
+    # Filter before merge so an older intraday session cache cannot replace a
+    # completed persisted close for the same identity/day.
+    return _merge_price_frames(
+        [
+            completed_market_prices(frame)
+            for frame in (stored_prices, _market_qualified_current_prices(st))
+            if frame is not None
+        ]
+    )
 
 
 def _merge_price_frames(frames: Sequence[pd.DataFrame | None]) -> pd.DataFrame | None:
@@ -3599,15 +3653,20 @@ def _ensure_symbol_data(
                 display_symbol, market=cast(ProviderMarket, market)
             )
             fetched_fundamental_rows = len(fundamental_result.data)
-            _persist_auto_fundamentals(fundamental_result.data)
+            # Only the new explicit provider request establishes this identity.
+            # Persist exactly the same qualified rows used in the session;
+            # existing UNKNOWN CSV rows are never assigned by price inference.
+            # AUTO fundamentals cannot borrow a market resolved only by prices.
+            fetched_fundamentals = _qualify_generic_frame(
+                fundamental_result.data,
+                symbol=display_symbol,
+                market=_canonical_market_or_unknown(market),
+            )
+            _persist_auto_fundamentals(fetched_fundamentals)
             fundamentals = _merge_fundamental_identity_frames(
                 [
                     st.session_state.fundamentals,
-                    _qualify_generic_frame(
-                        fundamental_result.data,
-                        symbol=display_symbol,
-                        market=requested_market,
-                    ),
+                    fetched_fundamentals,
                 ]
             )
             _set_fundamentals_state(st, fundamentals)
@@ -3665,11 +3724,18 @@ def _build_research_snapshot(st: Any, *, symbol: str, market: str) -> Any:
     display_symbol = _dashboard_symbol(symbol, canonical_market)
     canonical_symbol = Symbol(display_symbol, Market.parse(canonical_market))
     prices = _filter_symbol_market(st.session_state.price_data, display_symbol, canonical_market)
-    indicators = _filter_identity(
-        st.session_state.technical_indicators,
-        symbol=display_symbol,
+    from stock_tool.application.completed_daily_prices import completed_daily_prices
+
+    # The filtered rows establish market + symbol before the completion gate.
+    # Session metadata is global and has no binding to this batch, even when
+    # its identity happens to match. Only row acquisition times may qualify it.
+    prices, completion_notices = completed_daily_prices(
+        prices,
         market=canonical_market,
     )
+    # Recompute from the exact completed-bar view; cached indicators may include
+    # an intraday tail or a previous security. Keep the original session untouched.
+    indicators = compute_technical_indicators(prices) if not prices.empty else pd.DataFrame()
     fundamentals = _filter_identity(
         st.session_state.fundamental_scores,
         symbol=display_symbol,
@@ -3694,18 +3760,31 @@ def _build_research_snapshot(st: Any, *, symbol: str, market: str) -> Any:
             indicators if not indicators.empty else None,
             symbol=display_symbol,
         )
-    source = st.session_state.price_data_source or {}
+    # Per-row provenance survives persistence and belongs to this identity.
+    # Missing columns and null values remain unknown; never borrow session
+    # values (including updated_at or warnings) from a different price batch.
+    source: dict[str, str | None] = {}
+    if not prices.empty:
+        latest = prices.sort_values("date", kind="stable").iloc[-1]
+        for column, key in (
+            ("provider", "provider"),
+            ("provider_symbol", "query_symbol"),
+            ("source_type", "source_type"),
+            ("fetched_at", "fetched_at"),
+        ):
+            if column in prices:
+                source[key] = _optional_text(latest[column]) if pd.notna(latest[column]) else None
     source_metadata = ResearchSourceMetadata(
         provider=_optional_text(source.get("provider")),
-        query_symbol=_optional_text(source.get("query_symbol")) or display_symbol,
+        query_symbol=_optional_text(source.get("query_symbol")),
         market=canonical_market,
         source_type=_research_source_type(source.get("source_type")),
-        fetched_at=_optional_text(source.get("updated_at")),
+        fetched_at=_optional_text(source.get("fetched_at")),
         last_data_date=(
             str(prices["date"].max()) if not prices.empty and "date" in prices else None
         ),
         row_count=len(prices),
-        warnings=tuple(source.get("warnings") or ()),
+        warnings=completion_notices,
         limitations=("資料來源類型與最後資料日期依本次已載入資料顯示；不宣稱即時行情。",),
     )
     profile = _get_company_research_profile(st, display_symbol)
@@ -4424,7 +4503,7 @@ def _display_backtest_interpretation(
             ("CAGR", _percent(metrics.cagr)),
             ("最大回撤", _percent(metrics.max_drawdown)),
             ("Sharpe Ratio", _number(metrics.sharpe_ratio)),
-            ("交易次數", metrics.number_of_trades),
+            ("成交筆數（fills）", metrics.number_of_trades),
         ],
     )
     st.caption(
@@ -4482,6 +4561,8 @@ def _strategy_controls(st: Any, *, strategy_key: str, target_percent: float) -> 
 
 
 def _display_metrics(st: Any, result: BacktestResult) -> None:
+    from stock_tool.reports.models import format_trade_win_rate
+
     metrics = result.metrics
     _display_metric_cards(
         st,
@@ -4489,7 +4570,7 @@ def _display_metrics(st: Any, result: BacktestResult) -> None:
             ("總報酬率", _percent(metrics.total_return)),
             ("年化報酬率", _percent(metrics.cagr)),
             ("最大回撤", _percent(metrics.max_drawdown)),
-            ("交易次數", metrics.number_of_trades),
+            ("成交筆數（fills）", metrics.number_of_trades),
         ],
     )
     detail = pd.DataFrame(
@@ -4497,7 +4578,7 @@ def _display_metrics(st: Any, result: BacktestResult) -> None:
             {"指標": "年化波動率", "數值": _percent(metrics.annualized_volatility)},
             {"指標": "夏普比率", "數值": _number(metrics.sharpe_ratio)},
             {"指標": "Sortino 比率", "數值": _number(metrics.sortino_ratio)},
-            {"指標": "勝率", "數值": _percent(metrics.win_rate)},
+            {"指標": "勝率", "數值": format_trade_win_rate(metrics)},
             {"指標": "盈虧比", "數值": _number(metrics.profit_factor)},
             {"指標": "曝險比例", "數值": _percent(metrics.exposure)},
         ]

@@ -55,6 +55,7 @@ def _market_qualified_prices() -> pd.DataFrame:
                     "source_type": "cache",
                     "last_data_date": "2024-01-03",
                     "checked_at": "2024-01-12T08:00:00+00:00",
+                    "fetched_at": "2024-01-12T08:00:00+00:00",
                 }
             )
     return pd.DataFrame(rows)
@@ -112,6 +113,10 @@ def test_daily_home_reloads_market_qualified_prices_after_new_session(
 
 def test_streamlit_restart_home_shows_persisted_price_coverage(tmp_path, monkeypatch) -> None:
     """A new app process reads the isolated sidecar instead of losing market identities."""
+    from stock_tool.dashboard.components import daily_holdings
+    from stock_tool.application.daily_holdings_job import DailyJob
+
+    monkeypatch.setattr(daily_holdings, "start_refresh", lambda *_a, **_k: DailyJob())
 
     runtime = tmp_path / "app-runtime"
     data_dir = runtime / "data"
@@ -136,10 +141,15 @@ def test_streamlit_restart_home_shows_persisted_price_coverage(tmp_path, monkeyp
     app = AppTest.from_file(str(_app_path())).run(timeout=20)
 
     assert not app.exception
-    metrics = {metric.label: metric.value for metric in app.metric}
-    assert metrics["持股筆數"] == "3"
-    assert metrics["已有價格資料"] == "3/3"
-    assert metrics["價格覆蓋率"] == "100.0%"
+    assert any("持股筆數：3" in item.value for item in app.caption)
+    loaded = app.session_state["price_data"]
+    assert set(zip(loaded["market"], loaded["symbol"])) == {
+        ("TWSE", "2330"),
+        ("TPEX", "6488"),
+        ("US", "AAPL"),
+    }
+    # Old quotes remain available for research, not a current-coverage claim.
+    assert not any(metric.label == "價格覆蓋率" for metric in app.metric)
 
 
 def test_persisted_same_ticker_in_different_markets_does_not_collide(tmp_path) -> None:

@@ -326,6 +326,9 @@ class BacktestEngine:
         metrics = PerformanceMetrics.calculate(
             equity_curve=equity_curve,
             trades=trades,
+            price_data=prices,
+            execution_price_col=self.broker.config.execution_price_col,
+            has_corporate_actions=bool(self.corporate_actions),
             initial_cash=self.initial_cash,
             benchmark=benchmark,
             strategy_return_basis=self.return_basis,

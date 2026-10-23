@@ -1,0 +1,43 @@
+{
+  "scope": "Accepted real-market end-to-end checks plus provenance isolation P1 r2; source only",
+  "sync_date": "2026-10-22",
+  "code_commit": "fb0fa734e2284602fa10fd76ca9a57d09db9e92d",
+  "files": {
+    "src/stock_tool/dashboard/app.py": "5781e367e65ffa6a40db9ace57d3aa2317ba60a5ffdb7f816b4229b10b906037",
+    "src/stock_tool/dashboard/components/research_header.py": "8f889e564cb0b222ce641c3a42b8a7fd17e21d6670c54533f9861e60eb9d5b0f",
+    "src/stock_tool/dashboard/components/watchlist_comparison.py": "586baa3c1df9b55362611ff04b1e2d34c22b0401c793070ff9a52f7e7e706aa5",
+    "tests/test_normal_research_availability.py": "1882bcd6cac02fc46f3b78d884ae3a7386651b35dd7306336d7c96c06fb9c747",
+    "tests/test_research_header_completeness.py": "4ee5d122634defbe397d5543771f8d50df358f825b63521dda697671e9ee36d0",
+    "tests/test_dashboard.py": "fae32f07720b22bf19c35d2a205ef7492338405f7c57cd7a1860cbc5e1a5ceb5",
+    "tests/test_research_provenance_isolation.py": "f4ccb4649e6aae1efa2e2f086de9b833eb63290ef737fddbd1497b8416fd1b9a"
+  },
+  "accepted_source_manifest_sha256": "08a72174c80de01a8db2c17098fa3522fe01d8720197b6fae8c8a8dec2689b55",
+  "accepted_evidence_index_sha256": "440c1af88e01bf0c5aa16cceb0149516fc93d2ef86852f70f1cff65f364e723f",
+  "independent_reports": {
+    "initial_review_20261021_sha256": "5c0c3727a1d0338a9e98a97f72d7b7d13e63c80bfd215a5705133a2b1012a74e",
+    "p1_r2_pass_20261021_sha256": "12d9547b288c482d0350b4a6f9ed46cd7bbed2342a7fc1cf27c03e059759ac01"
+  },
+  "preserved_original_evidence_index_sha256": "02a96bde5e543315af67667e89b0c07ef2fcd712e37784e55f8b9bab41f36024",
+  "acceptance": {
+    "targeted_tests": 175,
+    "independent_extra_probes": 23,
+    "warnings": 2,
+    "full_pytest_and_coverage": "not rerun in this scoped batch",
+    "exe": "not built or accepted for these changes",
+    "scenario_real_data": "incomplete / NO-GO"
+  },
+  "public_reference_files_not_uploaded": {
+    "official-3006.json": "ae2cd31d67d81270ec403b32d70e2a1395c85d3d33d114d8bac4ab58c7fe681e",
+    "official-6669.json": "b56231e7b005fe698627c3a0f8f298efd2bcda18275400acbfbc2358523854a9",
+    "official-6933.json": "75f6a58612a6a651a3e8c4973750d27cfb321ce56bea91d47cfde3ca1f818119"
+  },
+  "excluded": [
+    "credentials and private holdings",
+    "runtime, databases and caches",
+    "raw public-provider responses and captures",
+    "machine-specific acceptance reports and screenshots",
+    "EXEs and installers",
+    "unaccepted or unrelated local changes"
+  ],
+  "sync_checks": "Allowlisted bytes matched accepted r2; staged content and privacy checked; no acceptance rerun"
+}

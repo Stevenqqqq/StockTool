@@ -21,7 +21,7 @@ def prices(**updates):
         symbol="MU",
         market="US",
         close=100,
-        date="2026-09-08",
+        date="2026-09-07",  # Completed US session, not the premarket fetch day.
         fetched_at="2026-09-08T10:00:00Z",
         provider="fixture",
     )
@@ -141,7 +141,7 @@ def test_ui_auto_refresh_once_and_cost_edit_recalculates_without_refetch(tmp_pat
     app = AppTest.from_string("""
 import streamlit as st
 import pandas as pd
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timedelta
 from types import SimpleNamespace
 from stock_tool.application.portfolio_workspace import PortfolioWorkspaceApplicationService
 from stock_tool.dashboard.pages.portfolio_workspace import render_portfolio_workspace
@@ -149,7 +149,8 @@ from stock_tool.portfolio_valuation import FxQuote
 def refresh():
     st.session_state['refresh_count'] = st.session_state.get('refresh_count', 0) + 1
     stamp = datetime.now(UTC).isoformat()
-    st.session_state.price_data = pd.DataFrame([dict(symbol='MU', market='US', date=stamp[:10], close=100., provider='fixture', fetched_at=stamp)])
+    completed_day = (datetime.now(UTC) - timedelta(days=1)).date().isoformat()
+    st.session_state.price_data = pd.DataFrame([dict(symbol='MU', market='US', date=completed_day, close=100., provider='fixture', fetched_at=stamp)])
     st.session_state.portfolio_fx_resolution = SimpleNamespace(quote=FxQuote.manual('USD', 'TWD', 32, stamp))
     return ()
 render_portfolio_workspace(st, service=PortfolioWorkspaceApplicationService(), refresh_callback=refresh)

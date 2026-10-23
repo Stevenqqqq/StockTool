@@ -345,6 +345,8 @@ def test_headless_refreshes_official_markets_once_and_reuses_same_snapshot(
 
     import stock_tool.application.daily_research_scheduler as scheduler_module
 
+    monkeypatch.setattr(scheduler_module, "_publish_daily_holdings", lambda *_a, **_k: None)
+
     paths = RuntimePaths(tmp_path / "runtime").ensure_directories()
     frame = pd.DataFrame([{"symbol": "2330", "market": "TWSE"}])
     paths.portfolio_file.write_text(
@@ -356,7 +358,7 @@ def test_headless_refreshes_official_markets_once_and_reuses_same_snapshot(
     monkeypatch.setattr(
         scheduler_module,
         "_load_price_context",
-        lambda _paths: (
+        lambda _paths, **_kwargs: (
             pd.DataFrame(
                 [{"symbol": "2330", "market": "TWSE", "date": "2026-08-23", "close": 600.0}]
             ),

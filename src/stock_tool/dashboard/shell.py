@@ -99,6 +99,7 @@ class DashboardShellDependencies:
     build_research_snapshot: Callable[..., Any] | None = None
     build_daily_brief: Callable[[Any], DailyBrief] | None = None
     build_daily_research_loop: Callable[[Any], DailyResearchLoopResult] | None = None
+    render_daily_holdings: Callable[[Any], HomeAction | None] | None = None
     refresh_daily_data: Callable[[Any], DailyRefreshResult] | None = None
     run_daily_research: Callable[[], DailyResearchRunOutcome] | None = None
     build_daily_research_run: Callable[[], DailyResearchRunManifest | None] | None = None
@@ -289,6 +290,16 @@ def _render_home_workspace(
         portfolio_path=dependencies.portfolio_path,
         watchlist_path=dependencies.watchlist_path,
     )
+    holdings_daily_available = bool(summary.portfolio_count and dependencies.render_daily_holdings)
+    if holdings_daily_available and dependencies.render_daily_holdings is not None:
+        holding_action = dependencies.render_daily_holdings(st)
+        if holding_action is not None:
+            _handle_home_action(st, dependencies, holding_action)
+            _execute_pending_shell_search(st, dependencies)
+            if st.session_state.get("dashboard_show_research_workspace", False):
+                st.rerun()
+                return
+            st.warning("這筆持股研究暫時無法開啟；每日摘要與已保存觀察仍保留，可稍後再試。")
     daily_brief = dependencies.build_daily_brief(st) if dependencies.build_daily_brief else None
     inbox_entries: tuple[ResearchInboxEntry, ...] = ()
     inbox_brief: DailyResearchBrief | None = None
@@ -355,6 +366,7 @@ def _render_home_workspace(
         updated_at=source.get("end_date"),
         summary_warnings=summary.warnings + ((inbox_warning,) if inbox_warning else ()),
         daily_brief=daily_brief,
+        holdings_daily_available=holdings_daily_available,
         daily_research_loop=(
             dependencies.build_daily_research_loop(st)
             if dependencies.build_daily_research_loop
@@ -546,10 +558,18 @@ def _render_research_with_handoff(st: Any, snapshot: Any) -> Any:
     return render_research_workspace(
         st,
         snapshot,
+        on_compare=lambda: _open_research_comparison(st),
         on_handoff=lambda destination, current: _route_research_workspace_handoff(
             st, destination, current
         ),
     )
+
+
+def _open_research_comparison(st: Any) -> None:
+    """Open the existing watchlist; never add a symbol or refresh its prices."""
+    st.session_state["research_comparison_focus"] = True
+    navigate_to_workspace(st.session_state, workspace="explore", legacy_page="自選股清單")
+    st.rerun()
 
 
 def _render_daily_refresh_result(st: Any) -> None:
@@ -617,6 +637,16 @@ def _render_workspace(
             st.warning(handoff_error)
             return
     if item.key == "explore":
+        if st.session_state.get("research_comparison_focus", False):
+            # Focus the existing tool, not the unrelated market/concept overview.
+            st.session_state["dashboard_pending_workspace_destination"] = None
+            if st.button("返回探索", key="watchlist_back_to_explore"):
+                st.session_state["research_comparison_focus"] = False
+                st.session_state["workspace_explore_secondary_navigation"] = "工作區總覽"
+                st.rerun()
+                return
+            _render_legacy_page_safely(st, dependencies, "自選股清單")
+            return
         concept_path = dependencies.concept_path or (Path("data") / "sample" / "concept_stocks.csv")
         service = ExploreApplicationService(
             concept_path=concept_path,

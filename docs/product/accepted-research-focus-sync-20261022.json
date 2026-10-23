@@ -1,0 +1,37 @@
+{
+  "scope": "Accepted research focus v1 source and 3006 normal source UI; not EXE or formal release",
+  "sync_date": "2026-10-22",
+  "code_commit": "a75522ed618d649a8a8bb34a6701f40c55030ce5",
+  "files": {
+    "src/stock_tool/dashboard/components/research_header.py": "d9dda08263018d8de80e1dfa5a5330b2acf6c4395b67c4b9c011731fbe60c861",
+    "tests/test_research_focus.py": "b2e8050833da2b200dbbc3f8578fad3ab58dc23030bc230dbfdd2696a3efbd73"
+  },
+  "accepted_source_manifest_sha256": "a3298d9b546e03ff8f28baf319daba49cc19ef96e1205c6744e5dfc2f544e037",
+  "accepted_evidence_index_sha256": "f5ffa61f848fde596254039794469930dbee7620596a25c0da8044f5e4c77ed3",
+  "independent_report_sha256": "fb383d9e3065135f73c7ced652f51e59c8ceb20607e21d9bc3c62acaef5f73bc",
+  "independent_acceptance": {
+    "related_pytest_passed": 136,
+    "new_cases_in_suite": 17,
+    "extra_component_probes": 13,
+    "warnings": 1,
+    "normal_browser_case": "TWSE/3006, free Yahoo data, 1280x720",
+    "other_cases": "6669/6933, Synthetic and missing-data scenarios: component/regression evidence only",
+    "full_pytest_coverage_exe": "not rerun or built for this batch"
+  },
+  "remaining_limits": [
+    "support/counter evidence classifies existing breakout conditions, not a complete investment thesis",
+    "vertical scrolling required; narrow viewport, native zoom and full keyboard journey not revalidated",
+    "P2: company first sentence lists technical product terms; plain-language explanation remains below",
+    "P2: low-contrast captions and header length can improve later",
+    "Yahoo latency and unverified TWSE volume equivalence; no new official price verification",
+    "Scenario Research real-data qualification remains incomplete / NO-GO",
+    "v1.4.3 installed baseline and historical quality/release limitations unchanged"
+  ],
+  "excluded": [
+    "private acceptance reports and screenshots",
+    "runtime, raw captures, personal holdings and credentials",
+    "candidate binaries and installers",
+    "unaccepted or unrelated local changes"
+  ],
+  "sync_validation": "Allowlisted accepted bytes, staged blob hashes and privacy checked; no acceptance rerun"
+}

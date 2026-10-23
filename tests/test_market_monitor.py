@@ -469,7 +469,7 @@ def test_evidence_fixture_mode_rejects_non_temp_data_root(tmp_path: Path, monkey
     fixture_dir = tmp_path / "fixtures"
     fixture_dir.mkdir()
     monkeypatch.setenv("STOCK_TOOL_EVIDENCE_MODE", "sprint32.1.1")
-    monkeypatch.setenv("STOCK_TOOL_USER_DATA_DIR", str(Path.cwd()))
+    monkeypatch.setenv("STOCK_TOOL_USER_DATA_DIR", str(Path(tmp_path.anchor)))
     monkeypatch.setenv("STOCK_TOOL_EVIDENCE_FIXTURE_DIR", str(fixture_dir))
 
     with pytest.raises(ValueError, match="system temp"):

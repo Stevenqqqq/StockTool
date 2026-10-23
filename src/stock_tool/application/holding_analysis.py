@@ -7,11 +7,18 @@ from datetime import UTC, datetime
 import hashlib
 import json
 import math
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from stock_tool.application.completed_daily_prices import (
+    completed_daily_prices,
+    completed_market_prices,
+)
 from stock_tool.portfolio_valuation import FxQuote
 from stock_tool.research.evidence import ClaimKind, EvidenceBundle, EvidenceRecord
+
+_CACHED_CLOSE_REFERENCE = "快取收盤價參考"
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +118,40 @@ def _age_status(as_of: str, fetched_at: str, now: datetime) -> str:
     return "可能過期" if ages[0] > 7 * 86400 or ages[1] > 86400 else "可用"
 
 
+def _price_reference_status(as_of: str, fetched_at: str, market: str, now: datetime) -> str:
+    """Separate check freshness from a bounded historical close reference.
+
+    Keep the existing seven-day price-date bound and all unknown/future gates.
+    An old fetch can only support a reference if its explicit acquisition date
+    could contain that exchange-local bar. This is not a calendar qualification.
+    FX deliberately continues using the stricter, unchanged _age_status gate.
+    """
+    status = _age_status(as_of, fetched_at, now)
+    if status != "可能過期":
+        return status
+    try:
+        zone = ZoneInfo(
+            {"TWSE": "Asia/Taipei", "TPEX": "Asia/Taipei", "US": "America/New_York"}[market]
+        )
+        day, acquired = pd.Timestamp(as_of), pd.Timestamp(fetched_at)
+        if acquired.tzinfo is None:
+            return status
+        local_day = day.tz_convert(zone).date() if day.tzinfo else day.date()
+        if local_day > acquired.tz_convert(zone).date():
+            return "日期衝突"
+        age = (pd.Timestamp(now) - pd.to_datetime(as_of, utc=True)).total_seconds()
+        if age > 7 * 86400:
+            return status
+        # Reuse the accepted completion boundary: an old intraday acquisition
+        # must not become a completed close just because it is read later.
+        completed, _ = completed_daily_prices(
+            pd.DataFrame([{"date": as_of}]), market=market, fetched_at=fetched_at, now=now
+        )
+        return _CACHED_CLOSE_REFERENCE if not completed.empty else "完成狀態待確認"
+    except (ValueError, TypeError, KeyError, OverflowError):
+        return status
+
+
 def validated_holding_prices(
     positions: pd.DataFrame,
     prices: object,
@@ -123,7 +164,7 @@ def validated_holding_prices(
         return None
     if not {"symbol", "market", "date", "close"}.issubset(prices.columns):
         return None
-    result = prices.copy(deep=True)
+    result = completed_market_prices(prices, now=now)
     for position in positions.to_dict("records"):
         identity = f"{position['symbol']}|{position['market']}"
         profile = profiles.get(identity)
@@ -217,6 +258,25 @@ def build_holding_analysis(
         selected["_date"] = pd.to_datetime(selected["date"], errors="coerce", utc=True)
         selected = selected.dropna(subset=["_date"]).sort_values("_date")
         if not selected.empty:
+            original_latest = selected.iloc[-1]
+            if (
+                _price_reference_status(
+                    _text(original_latest.get("date")),
+                    _text(original_latest.get("fetched_at")),
+                    market,
+                    now,
+                )
+                == "日期衝突"
+            ):
+                # Retain the existing conflict refusal; do not mask corrupt
+                # chronology by quietly choosing an older valuation instead.
+                gaps.append("價格日期衝突，暫停估值；未以較舊價格掩蓋衝突。")
+                selected = selected.iloc[:0]
+        selected, completion_notices = completed_daily_prices(selected, market=market, now=now)
+        gaps.extend(completion_notices)
+        selected["_date"] = pd.to_datetime(selected["date"], errors="coerce", utc=True)
+        selected = selected.sort_values("_date")
+        if not selected.empty:
             row = selected.iloc[-1]
             latest = selected.loc[selected["_date"] == row["_date"]]
             if latest["close"].nunique(dropna=False) > 1:
@@ -226,14 +286,21 @@ def build_holding_analysis(
         gaps.append("尚無這筆持股的有效日期價格；市值暫時無法計算。")
     else:
         price = _number(row.get("close"))
-        date = _text(row.get("date"))
-        fetched = _text(row.get("fetched_at")) or _text(row.get("checked_at"))
+        date = pd.Timestamp(row["date"]).date().isoformat()
+        fetched = _text(row.get("fetched_at"))
         source = _text(row.get("provider")) or "來源未確認"
-        status = _age_status(date, fetched, now)
-        if source == "來源未確認" and status == "可用":
+        status = _price_reference_status(date, fetched, market, now)
+        if source == "來源未確認" and status in {"可用", _CACHED_CLOSE_REFERENCE}:
             status = "來源待確認"
-        price_usable = status == "可用" and not currency_conflict
-        reason = "" if not refresh_failed else "本次更新失敗，保留前次資料。"
+        price_usable = status in {"可用", _CACHED_CLOSE_REFERENCE} and not currency_conflict
+        reason = (
+            "原始取得時間已逾24小時；依已載入收盤價作參考估值，非即時報價，"
+            "尚未確認有無更新行情。"
+            if status == _CACHED_CLOSE_REFERENCE
+            else ""
+        )
+        if refresh_failed:
+            reason = "本次更新失敗，保留前次資料。" + reason
         if refresh_failed and status == "可用":
             status = "保留前次資料"
         if price is None or price <= 0:

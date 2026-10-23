@@ -16,9 +16,11 @@ from stock_tool.application.portfolio_workspace import (
 from stock_tool.portfolio_stress import StressScenario, StressScenarioType
 from stock_tool.portfolio_valuation import Currency, FxQuote
 from stock_tool.application.holding_analysis import holding_fx_is_usable, validated_holding_prices
+from stock_tool.dashboard.instrument_names import name_notice
 
 
 from stock_tool.dashboard.presentation_mapper import (
+    format_taiwan_company_display,
     format_iso_datetime,
     format_source_state_label,
     format_status_label,
@@ -217,7 +219,10 @@ def _render_first_screen(st: Any, snapshot: Any, analysis: object) -> None:
     if result is None:
         st.info("尚未分析持股；請點擊下方「分析持倉」以計算最新估值與風險。")
         return
-    st.caption("此處呈現持股估值；財報、事件與基金成分的完整程度請看單筆分析。")
+    st.caption(
+        "依每筆已載入的最新可用收盤價作參考估值，非即時報價；"
+        "價格日期、取得時間與新鮮度請看單筆分析。財報、事件與基金成分的完整度另列。"
+    )
     with _safe_expander(st, "詳細技術診斷與可重現資料", expanded=False):
         st.caption(f"診斷 manifest digest：{result.manifest.digest}")
     if market_value is None:
@@ -372,6 +377,22 @@ def _render_position_table(
     st.subheader("現有持股清單")
     display_df = positions[["symbol", "market", "currency", "quantity", "average_cost"]].copy()
     display_df.columns = ["股票代號", "市場", "幣別", "持股數量", "平均成本"]
+    display_df.insert(
+        1,
+        "標的名稱",
+        [
+            format_taiwan_company_display(str(row.symbol), market=str(row.market))
+            for row in positions.itertuples(index=False)
+        ],
+    )
+    display_df["名稱確認"] = [
+        (
+            (name_notice(str(row.market), str(row.symbol)) or "官方名稱已確認")
+            if str(row.market) in {"TWSE", "TPEX"}
+            else "原始名稱／代號"
+        )
+        for row in positions.itertuples(index=False)
+    ]
     st.dataframe(
         display_df,
         width="stretch",
@@ -488,6 +509,10 @@ def _render_analysis(
     st.subheader("持股市值與集中度")
     if not analysis.valuation.positions.empty:
         val_df = analysis.valuation.positions.copy(deep=True)
+        val_df["標的名稱"] = [
+            format_taiwan_company_display(str(row.symbol), market=str(row.market))
+            for row in val_df.itertuples(index=False)
+        ]
         rename_map = {
             "symbol": "股票代號",
             "market": "市場",
@@ -508,6 +533,7 @@ def _render_analysis(
         }
         visible = [
             "symbol",
+            "標的名稱",
             "market",
             "quantity",
             "native_currency",

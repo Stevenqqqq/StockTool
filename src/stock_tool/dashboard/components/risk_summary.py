@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from stock_tool.application.research_snapshot import ResearchSnapshot
+from stock_tool.dashboard.components.scenario_reference_presentation import scenario_date_status
 
 
 def render_risk_summary(st: Any, snapshot: ResearchSnapshot) -> None:
@@ -18,9 +19,11 @@ def render_risk_summary(st: Any, snapshot: ResearchSnapshot) -> None:
     else:
         st.info("資料不足，尚無法整理主要風險。")
     scenario = snapshot.scenario_reference
-    if scenario is None or not scenario.available:
-        st.info("資料不足，尚無法建立情境參考區間。")
+    usable, date_label = scenario_date_status(snapshot)
+    if not usable or scenario is None:
+        st.info(f"情境價位：資料不足（unavailable）；{date_label}")
         return
+    st.caption(date_label)
     st.markdown(f"**{scenario.title}（研究用，非投資建議）**")
     columns = st.columns(3)
     range_text = (
@@ -41,7 +44,7 @@ def render_risk_summary(st: Any, snapshot: ResearchSnapshot) -> None:
         "風險參考值",
         "資料不足" if scenario.risk_reference is None else f"{scenario.risk_reference:,.2f}",
     )
-    st.caption(f"方法：{scenario.method}；基準日：{scenario.as_of_date or '資料不足'}。")
+    st.caption(f"方法：{scenario.method}；{date_label}。")
     for assumption in scenario.assumptions:
         st.caption(f"假設：{assumption}")
     for limitation in scenario.limitations:

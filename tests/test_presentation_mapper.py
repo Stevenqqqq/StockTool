@@ -152,17 +152,11 @@ def test_get_next_trading_date() -> None:
 
 
 def test_format_taiwan_company_display() -> None:
-    assert format_taiwan_company_display("2330") == "台積電 (2330)"
+    # Without a confirmed official directory, do not silently use the legacy map.
+    assert format_taiwan_company_display("2330") == "2330"
     assert format_taiwan_company_display("2330", "台積電") == "台積電 (2330)"
-    assert (
-        format_taiwan_company_display("2330", "Taiwan Semiconductor Manufacturing Company Limited")
-        == "台積電 (2330)"
-    )
-    assert format_taiwan_company_display("2330", "Taiwan Semiconductor") == "台積電 (2330)"
-    assert format_taiwan_company_display("2454", "MediaTek Inc.") == "聯發科 (2454)"
-    assert format_taiwan_company_display("2317", "Hon Hai Precision Industry") == "鴻海 (2317)"
-    assert format_taiwan_company_display("2454", "聯發科") == "聯發科 (2454)"
-    assert format_taiwan_company_display("AAPL", "Apple Inc.") == "Apple Inc. (AAPL)"
+    assert format_taiwan_company_display("2330", "TSMC", market="US") == "TSMC (2330)"
+    assert format_taiwan_company_display("3006", "ESMT") == "ESMT (3006)"
     assert format_taiwan_company_display("9999", None) == "9999"
 
 

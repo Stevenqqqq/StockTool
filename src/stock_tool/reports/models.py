@@ -467,6 +467,18 @@ def data_period(price_data: pd.DataFrame | None) -> str:
     return f"{dates.min().date().isoformat()} ~ {dates.max().date().isoformat()}"
 
 
+def format_trade_win_rate(metrics: PerformanceMetrics) -> str:
+    """Present sample availability without changing the stored win-rate value."""
+    reason = metrics.trade_evidence_unavailable_reason
+    if reason is not None:
+        return f"資料不足：{reason or '完整交易分析不可用'}"
+    if metrics.closed_round_trip_count is None:
+        return "資料不足：完整交易樣本數未確認"
+    if metrics.closed_round_trip_count <= 0:
+        return "資料不足：尚無已平倉的完整交易"
+    return format_percent(metrics.win_rate)
+
+
 def metrics_to_frame(metrics: PerformanceMetrics) -> pd.DataFrame:
     """Convert performance metrics into a formatted DataFrame."""
 
@@ -477,10 +489,10 @@ def metrics_to_frame(metrics: PerformanceMetrics) -> pd.DataFrame:
         ("夏普比率", format_number(metrics.sharpe_ratio)),
         ("Sortino 比率", format_number(metrics.sortino_ratio)),
         ("最大回撤", format_percent(metrics.max_drawdown)),
-        ("勝率", format_percent(metrics.win_rate)),
+        ("勝率", format_trade_win_rate(metrics)),
         ("盈虧比", format_number(metrics.profit_factor)),
         ("平均持有天數", format_number(metrics.average_holding_period)),
-        ("交易次數", str(metrics.number_of_trades)),
+        ("成交筆數（fills）", str(metrics.number_of_trades)),
         ("曝險比例", format_percent(metrics.exposure)),
         ("基準總報酬率", format_percent(metrics.benchmark_total_return)),
         ("基準最大回撤", format_percent(metrics.benchmark_max_drawdown)),
